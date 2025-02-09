@@ -1,0 +1,22 @@
+ISIC2019:
+  gt_label_path: /workspace/home/data/ISIC2019/gt_label.csv
+  gt_wr_seg_path: /workspace/datasets/ISIC19/segmentation
+  gt_rr_seg_path: /todo
+  raw_path: /workspace/datasets/ISIC19/raw
+
+Pascal_VOC07:
+  gt_label_path: /workspace/home/data/Pascal_VOC07/gt_label.csv
+  gt_label_horses_path: /workspace/home/data/Pascal_VOC07/gt_label_horses.csv
+  gt_wr_seg_path: /workspace/home/data/Pascal_VOC07/gt_seg
+  gt_rr_seg_path: /todo
+  raw_path: /workspace/home/data/Pascal_VOC07/raw
+
+
+CelebA:
+  gt_label_path: /workspace/home/data/CelebA/gt_label.csv
+  gt_wr_seg_path: None
+  gt_rr_seg_path: /todo
+  raw_path: /workspace/home/data/CelebA/celebA_v1.0/img_align_celeba
+
+
+# ultimately data should be in repo
