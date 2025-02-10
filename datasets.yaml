@@ -3,6 +3,7 @@ ISIC2019:
   gt_wr_seg_path: /workspace/datasets/ISIC19/segmentation
   gt_rr_seg_path: /todo
   raw_path: /workspace/datasets/ISIC19/raw
+  confounded_class_label: 0
 
 Pascal_VOC07:
   gt_label_path: /workspace/home/data/Pascal_VOC07/gt_label.csv
@@ -17,6 +18,7 @@ CelebA:
   gt_wr_seg_path: None
   gt_rr_seg_path: /todo
   raw_path: /workspace/home/data/CelebA/celebA_v1.0/img_align_celeba
+  confounded_class_label: None
 
 
 # ultimately data should be in repo
