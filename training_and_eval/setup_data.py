@@ -27,10 +27,6 @@ class Dataset:
             f"{repo_dir}/data/datasets.yaml", "r"
         ) as file:  # adapt path later if repo is ready (without worksopace/home)
             dataset_yaml = yaml.safe_load(file)
-        # get confounded_class_label
-        self.confounded_class_label = dataset_yaml[self.dataset_name][
-            "confounded_class_label"
-        ]
         # set raw and gt paths
         self.raw_dir = dataset_yaml[self.dataset_name]["raw_dir"]
         self.wr_masks_dir = dataset_yaml[self.dataset_name]["wr_masks_dir"]
@@ -285,18 +281,33 @@ class Dataset:
         dataloaders["train"] = DataLoader(
             train_dataset, batch_size=batch_size, shuffle=True
         )
-        loss_weights["train"] = calculate_loss_weights(Counter(train_classes))
+        try:
+            loss_weights["train"] = calculate_loss_weights(Counter(train_classes))
+        except Exception as e:
+            print(e)
+            print("Setting loss weights to 0.5 for each class. TODO: Investigate")
+            loss_weights["train"] = torch.tensor([0.5, 0.5]).float()
 
         # val
         dataloaders["val"] = DataLoader(
             val_dataset, batch_size=batch_size, shuffle=True
         )
-        loss_weights["val"] = calculate_loss_weights(Counter(val_classes))
+        try:
+            loss_weights["val"] = calculate_loss_weights(Counter(train_classes))
+        except Exception as e:
+            print(e)
+            print("Setting loss weights to 0.5 for each class. TODO: Investigate")
+            loss_weights["val"] = torch.tensor([0.5, 0.5]).float()
 
         # test
         dataloaders["test"] = DataLoader(
             test_dataset, batch_size=batch_size, shuffle=True
         )
-        loss_weights["test"] = calculate_loss_weights(Counter(test_classes))
+        try:
+            loss_weights["test"] = calculate_loss_weights(Counter(train_classes))
+        except Exception as e:
+            print(e)
+            print("Setting loss weights to 0.5 for each class. TODO: Investigate")
+            loss_weights["test"] = torch.tensor([0.5, 0.5]).float()
 
         return dataloaders, loss_weights
