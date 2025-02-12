@@ -1,0 +1,18 @@
+ISIC19:
+  gt_label_path: /workspace/home/data/ISIC19/gt_label.csv
+  wr_masks_dir: /workspace/datasets/ISIC19/segmentation
+  rr_masks_dir: /todo
+  raw_dir: /workspace/datasets/ISIC19/raw
+
+Pascal_VOC07:
+  gt_label_path: /workspace/home/data/Pascal_VOC07/gt_label.csv
+  wr_masks_dir: /workspace/home/data/Pascal_VOC07/gt_seg
+  rr_masks_dir: /todo
+  raw_dir: /workspace/home/data/Pascal_VOC07/raw
+
+
+CelebA:
+  gt_label_path: /workspace/home/data/CelebA/gt_label.csv
+  wr_masks_dir: None
+  rr_masks_dir: /todo
+  raw_dir: /workspace/home/data/CelebA/celebA_v1.0/img_align_celeba
