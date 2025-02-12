@@ -7,7 +7,6 @@ import numpy as np
 from PIL import Image
 import torch
 from torch.utils.data import DataLoader, TensorDataset
-from torch.utils.data.dataset import ConcatDataset
 from torchvision.models import VGG16_Weights
 from collections import Counter
 from tqdm import tqdm
@@ -28,6 +27,10 @@ class Dataset:
             f"{repo_dir}/data/datasets.yaml", "r"
         ) as file:  # adapt path later if repo is ready (without worksopace/home)
             dataset_yaml = yaml.safe_load(file)
+        # get confounded_class_label
+        self.confounded_class_label = dataset_yaml[self.dataset_name][
+            "confounded_class_label"
+        ]
         # set raw and gt paths
         self.raw_dir = dataset_yaml[self.dataset_name]["raw_dir"]
         self.wr_masks_dir = dataset_yaml[self.dataset_name]["wr_masks_dir"]
