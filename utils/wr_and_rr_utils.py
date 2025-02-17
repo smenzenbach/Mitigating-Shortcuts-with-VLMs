@@ -505,7 +505,7 @@ def quantify_wr_rr_reason(
             encoding="utf-8",
         ) as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
-        return 100 * avg_activation_per_instance
+        return actScores
 
     else:
         if mode == "mean":
@@ -531,4 +531,4 @@ def quantify_wr_rr_reason(
             encoding="utf-8",
         ) as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
-        return actScores  # , len(actScores)
+        return float(value)  # , len(actScores)
