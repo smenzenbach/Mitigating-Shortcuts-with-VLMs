@@ -1,7 +1,7 @@
 ISIC19:
   gt_label_path: /workspace/home/data/ISIC19/gt_label.csv
   wr_masks_dir: /workspace/datasets/ISIC19/segmentation
-  rr_masks_dir: /todo
+  rr_masks_dir: /workspace/home/data/ISIC19/hint_data/masks_lesions
   raw_dir: /workspace/datasets/ISIC19/raw
 
 Pascal_VOC07:
