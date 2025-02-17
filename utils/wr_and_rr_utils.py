@@ -50,14 +50,13 @@ def show_explanation_single(
         sign=sign,
         show_colorbar=True,
         use_pyplot=False,
-        plt_fig_axis=(fig, ax),
         alpha_overlay=1.0,
     )
 
     if save_name is not None:
-        name_ = "eval_output/output_images/" + save_name + ".png"
-        plt.savefig(name_, bbox_inches="tight")
-        plt.close()
+        name_ = save_name + ".png"
+        fig.savefig(name_, bbox_inches="tight")
+        plt.close(fig)
 
         # # save img
         # name_raw_ = "output_images/raw/" + save_name + ".png"
@@ -223,7 +222,7 @@ def explain_with_ig_one_by_one(
     sign="positive",
     fig_header="IG (Ross)",
     next_to_each_other=False,
-    save_name=None,
+    save_name="IG-Activations",
     device="cuda",
     clip_pixel_values_to_zero_one=True,
     specified_img_indices=[],
@@ -255,6 +254,8 @@ def explain_with_ig_one_by_one(
     """
     model.eval()
     img_id = 0
+
+    os.makedirs(save_name, exist_ok=True)
 
     for data in dataloader:
         images_t, labels_t = data[0], data[1]
@@ -302,7 +303,7 @@ def explain_with_ig_one_by_one(
 
                 imgs, attrs, titles = [original_image], [attr], [title]
 
-                cur_save_name = save_name + "-" + str(img_id)
+                cur_save_name = save_name + "/" + str(img_id)
 
                 if next_to_each_other:
                     show_explanation_single(
@@ -368,7 +369,7 @@ def quantify_wr_rr_reason(
     flags=True,
 ):
     """
-    Quantifies wrong reason based on ground-truth explanations (i.e.
+    Quantifies wrong reason (wr)/right reason (rr) based on ground-truth explanations (i.e.
     measures the confounder activation for whole test set). Either mean or
     median pixel-level activation. If threshold=None then calculate
     the binarization threshold. To binarize heatmaps before measurement insert
@@ -390,6 +391,7 @@ def quantify_wr_rr_reason(
         flags: it True then only images with flag=1 are taking into account (ISIC19).
 
     """
+    print(f"Quantifying {metric} based on ground-truth explanations.")
 
     model.eval()
     actScores = []
@@ -398,12 +400,12 @@ def quantify_wr_rr_reason(
 
     with tqdm(dataloader, unit="batch") as tbatch:
         for data in tbatch:
-            mask_index = 2 if metric == "wr" else 3
+            mask_index = 3 if metric == "wr" else 4  # else: rr
             if flags:
                 images_t, masks_t, flags_t = (
                     data[0].to(device),
                     data[mask_index].to(device),
-                    data[6].to(device),
+                    data[2].to(device),
                 )
             else:
                 images_t, masks_t = data[0].to(device), data[mask_index].to(device)
@@ -459,9 +461,6 @@ def quantify_wr_rr_reason(
                 attr_ca = torch.sum(flat_attr_x_expl, dim=1)
                 masks_flat = masks_t.view(masks_t.size(0), -1)
                 attr_max = torch.sum(masks_flat, dim=1)
-
-                print(torch.unique(attr_max))
-
                 actScore = torch.div(attr_ca, attr_max)
                 actScores += actScore.tolist()
 
@@ -499,10 +498,9 @@ def quantify_wr_rr_reason(
             "cannot_attribute_num": cannot_attribute_num,
             "actScores": actScores,
         }
-        print(foldername)
         os.makedirs(foldername, exist_ok=True)
         with open(
-            foldername + f"-{mode}_{metric}_stats.json",
+            f"{foldername}/{mode}_{metric}_stats.json",
             "w",
             encoding="utf-8",
         ) as f:
@@ -528,9 +526,9 @@ def quantify_wr_rr_reason(
 
         os.makedirs(foldername, exist_ok=True)
         with open(
-            foldername + f"-{mode}-{metric}.json",
+            f"{foldername}/{mode}_{metric}.json",
             "w",
             encoding="utf-8",
         ) as f:
             json.dump(data, f, ensure_ascii=False, indent=4)
-        return float(value)  # , len(actScores)
+        return actScores  # , len(actScores)

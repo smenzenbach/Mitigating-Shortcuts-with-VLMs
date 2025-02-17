@@ -17,6 +17,9 @@ from rtpt import RTPT
 
 from utils import explain_with_ig_one_by_one, quantify_wr_rr_reason
 
+# get dir of repo (parent dir)
+repo_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 
 class Learner:
     """Implements a ML learner (based on PyTorch model)."""
@@ -50,17 +53,76 @@ class Learner:
         self.device = device
         self.modelname = modelname
         self.run_id = str(uuid.uuid1())
-        # self.log_folder = "logs/" + self.modelname
+        self.log_folder = f"{repo_dir}/training_and_eval/logs/" + self.modelname
         self.writer = SummaryWriter(
-            log_dir="runs/" + self.modelname + "--" + self.run_id,
+            log_dir=f"{repo_dir}/training_and_eval/runs/"
+            + self.modelname
+            + "--"
+            + self.run_id,
             comment="_" + self.modelname + "_id_{}".format(self.run_id),
         )
-        self.output_dir = os.path.abspath(
-            os.path.join(__file__, "../../..", "eval_output/modelname")
-        )
+        self.output_dir = f"{repo_dir}/training_and_eval/eval_output/{modelname}"
         os.makedirs(self.output_dir, exist_ok=True)
         if load:
             self.load(modelname + ".pt")
+
+    def score(self, dataloader, criterion, verbose=False):
+        """Returns the acc and loss on the specified dataloader."""
+        size = len(dataloader.dataset)
+        self.model.eval()
+        test_loss, correct = 0, 0
+        with torch.no_grad():
+            for data in dataloader:
+                X, y = data[0].to(self.device), data[1].to(self.device)
+                output = self.model(X)
+                # output = F.softmax(self.model(X), dim=1)
+                test_loss += criterion(output, y).item()
+                correct += (output.argmax(1) == y).type(torch.float).sum().item()
+
+        test_loss /= size
+        correct /= size
+        if verbose:
+            print(f"Test Error: Acc: {100*correct:>0.1f}%, Avg loss: {test_loss:>8f}")
+        return 100 * correct, test_loss
+
+    def save_learner(self, epochs=0, verbose=1, best=False):
+        """Save the model dict to disk."""
+        # if best:
+        #    self.modelname = self.modelname + "-bestOnTrain"
+        results = {
+            "weights": self.model.state_dict(),
+            "optimizer_dict": self.optimizer.state_dict(),
+            "modelname": self.modelname,
+            "loss": str(self.loss),
+            "epochs": epochs,
+            "rng_state": torch.get_rng_state(),
+        }
+        torch.save(
+            results,
+            f"{repo_dir}/training_and_eval/learner/model_store/"
+            + self.modelname
+            + ".pt",
+        )
+        if verbose == 1:
+            print("Model saved!")
+
+    def load(self, name):
+        """Load the model with name from the model_store."""
+        checkpoint = torch.load(
+            f"{repo_dir}/training_and_eval/learner/model_store/" + name,
+            map_location=torch.device(self.device),
+        )
+        self.model.load_state_dict(checkpoint["weights"])
+        epochs_ = "none"
+        if "optimizer_dict" in checkpoint:
+            self.optimizer.load_state_dict(checkpoint["optimizer_dict"])
+        if "rng_state" in checkpoint:
+            torch.set_rng_state(checkpoint["rng_state"].type(torch.ByteTensor))
+        if "epochs" in checkpoint:
+            epochs_ = checkpoint["epochs"]
+        print(
+            f"Model {self.modelname} loaded! Was trained on {checkpoint['loss']} for {epochs_} epochs!"
+        )
 
     def fit(
         self,
@@ -137,10 +199,10 @@ class Learner:
                 if verbose and (epoch % verbose_after_n_epochs == 0):
                     print(f"Epoch {epoch}| ", end="")
                     print(
-                        f"accuracy: {(train_acc):>0.1f}%, loss: {train_loss:>8f} | ",
+                        f"Tests: accuracy: {(train_acc):>0.1f}%, loss: {train_loss:>8f} | ",
                         end="",
                     )
-                    print(f"Val Error: Acc: {val_acc:>0.1f}%, Avg loss: {val_loss:>8f}")
+                    print(f"Val: accuracy: {val_acc:>0.1f}%, loss: {val_loss:>8f}")
                     # print(f" --number RAWR [{how_many_rawr_epoch}]")
 
                 # test acc on test set
@@ -153,10 +215,10 @@ class Learner:
                 # save the current best model on val set
                 if save_best and val_loss < best_val_loss:
                     best_val_loss = val_loss
-                    self.save_learner(verbose=False, best=True)
+                    self.save_learner(verbose=False, best=True, epochs=epoch)
 
                 if save_last:
-                    self.save_learner(verbose=False)
+                    self.save_learner(verbose=False, epochs=epoch)
 
         print(f"--> Training took {elapsed_time:>4f} seconds!")
         self.writer.flush()
@@ -171,7 +233,6 @@ class Learner:
         criterion=F.cross_entropy,
         class_labels=None,
         save=True,
-        savename="-stats",
     ):
         """Calculates confusion matrix and different statistics on dataloader."""
 
@@ -207,7 +268,9 @@ class Learner:
         print(f"{cr}")
 
         if save:
-            with open(f"{self.output_dir}/{self.modelname}{savename}.txt", "w") as f:
+            with open(
+                f"{self.output_dir}/{self.modelname}-STATS-test-accuracy.txt", "w"
+            ) as f:
                 f.write(f"Acc: {100*correct:>0.1f}%, Avg loss: {test_loss:>8f}\n")
                 f.write("Confusion matrix:\n")
                 f.write(f"{cm}\n")
@@ -219,7 +282,7 @@ class Learner:
         explain_with_ig_one_by_one(
             self.model,
             dataloader,
-            save_name=f"{self.output_dir}/IG-activations/",
+            save_name=f"{self.output_dir}/IG-activations",
             next_to_each_other=True,  # was False
             device=self.device,
         )
@@ -229,7 +292,7 @@ class Learner:
             self.model,
             self.device,
             foldername=f"{self.output_dir}/wr",
-            method="wr",
+            metric="wr",
             threshold=None,
             mode="mean",
             flags=True,
@@ -240,15 +303,15 @@ class Learner:
                 self.model,
                 self.device,
                 foldername=f"{self.output_dir}/wr",
-                method="wr",
+                metric="wr",
                 threshold=thresh,
                 mode="mean",
                 flags=True,
             )
         )
 
-        f = open(f"{self.output_dir}/{self.modelname}-wr_metric.txt", "w")
-        f.write(f"IG: {avg}\n " f"IG: mean:{np.mean(avg)}, std:{np.std(avg)}\n ")
+        f = open(f"{self.output_dir}/{self.modelname}-STATS-test-wr.txt", "w")
+        f.write(f"IG:\nmean:{np.mean(avg)},\n std:{np.std(avg)},\n {avg}")
         f.close()
 
     def get_rr_metric(self, dataloader):
@@ -258,8 +321,8 @@ class Learner:
             dataloader,
             self.model,
             self.device,
-            foldername=f"{self.output_dir}/wr",
-            method="rr",
+            foldername=f"{self.output_dir}/rr",
+            metric="rr",
             threshold=None,
             mode="mean",
             flags=True,
@@ -269,14 +332,14 @@ class Learner:
                 dataloader,
                 self.model,
                 self.device,
-                foldername=f"{self.output_dir}/wr",
-                method="rr",
+                foldername=f"{self.output_dir}/rr",
+                metric="rr",
                 threshold=thresh,
                 mode="mean",
                 flags=True,
             )
         )
 
-        f = open(f"{self.output_dir}/{self.modelname}-rr_metric.txt", "w")
-        f.write(f"IG: {avg}\n " f"IG: mean:{np.mean(avg)}, std:{np.std(avg)}\n ")
+        f = open(f"{self.output_dir}/{self.modelname}-STATS-test-rr.txt", "w")
+        f.write(f"IG: mean:{np.mean(avg)}\n, std:{np.std(avg)}\n {avg}")
         f.close()
