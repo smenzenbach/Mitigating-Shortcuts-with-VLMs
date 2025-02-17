@@ -311,7 +311,7 @@ class Learner:
         )
 
         f = open(f"{self.output_dir}/{self.modelname}-STATS-test-wr.txt", "w")
-        f.write(f"IG:\nmean:{np.mean(avg)},\n std:{np.std(avg)},\n {avg}")
+        f.write(f"IG:\nmean:{np.mean(avg)}\n std:{np.std(avg)}")
         f.close()
 
     def get_rr_metric(self, dataloader):
@@ -341,5 +341,5 @@ class Learner:
         )
 
         f = open(f"{self.output_dir}/{self.modelname}-STATS-test-rr.txt", "w")
-        f.write(f"IG: mean:{np.mean(avg)}\n, std:{np.std(avg)}\n {avg}")
+        f.write(f"IG:\nmean:{np.mean(avg)}\n std:{np.std(avg)}")
         f.close()
