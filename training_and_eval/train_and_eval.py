@@ -2,7 +2,7 @@ import argparse
 import datetime
 from setup_data import Dataset
 from learner.models import VGG16_pretrained
-from utils import seed_all
+from .utils import seed_all
 import torch.nn as nn
 import logging
 import torch
