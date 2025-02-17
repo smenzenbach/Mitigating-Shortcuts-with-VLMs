@@ -6,3 +6,7 @@ __pycache__/
 *.jpg
 *.jpeg
 
+# no eval results and logs
+**/training_and_eval/runs*
+**/training_and_eval/eval_output*
+**/training_and_eval/logs*
