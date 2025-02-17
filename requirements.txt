@@ -1,0 +1,19 @@
+torch
+torchvision
+scikit-learn
+pandas
+seaborn
+matplotlib
+tqdm
+rtpt
+pillow
+numpy
+h5py
+captum
+
+
+transformers
+
+# jupyter
+ipykernel
+jupyter
