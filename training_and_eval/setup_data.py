@@ -181,7 +181,7 @@ class Dataset:
 
         def calculate_loss_weights(counter):
             class0 = counter.get(0, 0)  # Get count of class 0, default to 0 if missing
-            class1 = counter.get(1, 0)  # Get count of class 1, default to 0 if missing
+            # class1 = counter.get(1, 0)  # Get count of class 1, default to 0 if missing
             class0_ratio = class0 / len(dataset)
             class1_ratio = 1 - class0_ratio
             if class0_ratio == 0:
@@ -193,10 +193,6 @@ class Dataset:
             weights = np.asarray([class0_weight, class1_weight])
             weights /= weights.sum()
             weights = torch.tensor(weights).float()
-            print("For train dataset:")
-            print(f"  TRAIN class dist: class 0: {class0}, class 1: {class1}")
-            print(f"  Loss weights: {str(weights)}")
-
             return weights
 
         # load data
@@ -256,58 +252,47 @@ class Dataset:
             f"TRAIN: {len(train_indices)}, VAL: {len(val_indices)}, TEST: {len(test_indices)}"
         )
 
-        train_classes = [x[1].item() for x in train_dataset]
-        train_confounder_dis = [x[2].item() for x in train_dataset]
-
-        val_classes = [x[1].item() for x in val_dataset]
-        val_confounder_dis = [x[2].item() for x in val_dataset]
-
-        test_classes = [x[1].item() for x in test_dataset]
-        test_confounder_dis = [x[2].item() for x in test_dataset]
-
-        print(f"TRAIN class dist: {Counter(train_classes)}")
-        print(f"TRAIN confounder dist: {Counter(train_confounder_dis)}")
-
-        print(f"VAL class dist: {Counter(val_classes)}")
-        print(f"VAL confounder dist: {Counter(val_confounder_dis)}")
-
-        print(f"TEST class dist: {Counter(test_classes)}")
-        print(f"TEST confounder dist: {Counter(test_confounder_dis)}")
-
         dataloaders = {}
         loss_weights = {}
 
         # train
+
+        train_classes = [x[1].item() for x in train_dataset]
+        train_confounder_dis = [x[2].item() for x in train_dataset]
+
         dataloaders["train"] = DataLoader(
             train_dataset, batch_size=batch_size, shuffle=True
         )
-        try:
-            loss_weights["train"] = calculate_loss_weights(Counter(train_classes))
-        except Exception as e:
-            print(e)
-            print("Setting loss weights to 0.5 for each class. TODO: Investigate")
-            loss_weights["train"] = torch.tensor([0.5, 0.5]).float()
+        loss_weights["train"] = calculate_loss_weights(Counter(train_classes))
+
+        print(f"\nTRAIN class dist: {Counter(train_classes)}")
+        print(f"TRAIN confounder dist: {Counter(train_confounder_dis)}")
+        print(f"TRAIN loss weights: {str(loss_weights['train'])}")
 
         # val
+        val_classes = [x[1].item() for x in val_dataset]
+        val_confounder_dis = [x[2].item() for x in val_dataset]
+
         dataloaders["val"] = DataLoader(
             val_dataset, batch_size=batch_size, shuffle=True
         )
-        try:
-            loss_weights["val"] = calculate_loss_weights(Counter(train_classes))
-        except Exception as e:
-            print(e)
-            print("Setting loss weights to 0.5 for each class. TODO: Investigate")
-            loss_weights["val"] = torch.tensor([0.5, 0.5]).float()
+        loss_weights["val"] = calculate_loss_weights(Counter(train_classes))
+
+        print(f"\nVAL class dist: {Counter(val_classes)}")
+        print(f"VAL confounder dist: {Counter(val_confounder_dis)}")
+        print(f"VAL loss weights: {str(loss_weights['val'])}")
 
         # test
+        test_classes = [x[1].item() for x in test_dataset]
+        test_confounder_dis = [x[2].item() for x in test_dataset]
+
         dataloaders["test"] = DataLoader(
             test_dataset, batch_size=batch_size, shuffle=True
         )
-        try:
-            loss_weights["test"] = calculate_loss_weights(Counter(train_classes))
-        except Exception as e:
-            print(e)
-            print("Setting loss weights to 0.5 for each class. TODO: Investigate")
-            loss_weights["test"] = torch.tensor([0.5, 0.5]).float()
+        loss_weights["test"] = calculate_loss_weights(Counter(train_classes))
+
+        print(f"\nTEST class dist: {Counter(test_classes)}")
+        print(f"TEST confounder dist: {Counter(test_confounder_dis)}")
+        print(f"TEST loss weights: {str(loss_weights['test'])}")
 
         return dataloaders, loss_weights

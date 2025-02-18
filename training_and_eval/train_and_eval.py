@@ -6,6 +6,7 @@ from utils import seed_all
 import torch.nn as nn
 import logging
 import torch
+import os
 
 from learner.learner import Learner
 
@@ -73,6 +74,9 @@ VERBOSE_AFTER_N_EPOCHS = 1
 
 print(f"Using device {DEVICE} and seed {SEED}")
 
+# get dir of repo (parent dir)
+repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 # Load data
 dataset = Dataset(dataset_name=args.dataset, model_name=args.model)
 
@@ -92,7 +96,7 @@ train_dataloader, val_loader, test_dataloader = (
 ########### Initalize model, loss and optimizer
 # Logging
 logging.basicConfig(
-    filename="shortcut_mitigation_training.log",
+    filename=f"{repo_dir}/training_and_eval/shortcut_mitigation_training.log",
     level=logging.INFO,
     filemode="a",
     format="%(asctime)s %(message)s",
@@ -149,11 +153,13 @@ if not args.load:
 
 ########### Evaluate
 # Accuracy
-learner.validation_statistics(test_dataloader, savename="-STATS-test-accuracy")
-logging.info("Test set only patches DONE (see file in logfolder)")
+learner.validation_statistics(test_dataloader)
+logging.info("Accuracy on test set DONE.")
 
 # WR
-learner.get_wr_metrics(test_dataloader, savename="-STATS-test-wr")
+learner.get_wr_metric(test_dataloader)
+logging.info("WR on test set DONE.")
 
 # RR
-learner.get_rr_metrics(test_dataloader, savename="-STATS-test-rr")
+learner.get_rr_metric(test_dataloader)
+logging.info("RR on test set DONE.")

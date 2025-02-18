@@ -4,6 +4,7 @@ from PIL import Image
 import warnings
 import csv
 import h5py
+from regex import F
 
 
 def file_name_from_file_path(filepath):
@@ -14,7 +15,7 @@ def file_name_from_file_path(filepath):
 
 def extract_index(filename):
     """
-    Extract the index from a filename in the format "image_index.jpg". Leading zeros are removed.
+    Extract the index from a filename in the format "text_index.jpg" and "index.jpg". Leading zeros are removed.
 
     Parameters
     ----------
@@ -32,9 +33,15 @@ def extract_index(filename):
         If the index is not found in the filename. In this case, the index 0 is returned.
 
     """
-    index = filename.split("_")[1]
-    # remove the file extension
-    index = index.split(".")[0]
+    # Check if the filename contains an underscore
+    if "_" in filename:
+        # remove the text part
+        index = filename.split("_")[1]
+        # remove the file extension
+        index = index.split(".")[0]
+    else:
+        # remove the file extension
+        index = filename.split(".")[0]
     # remove the leading zeros
     index = index.lstrip("0")
     if index == "":
@@ -45,24 +52,33 @@ def extract_index(filename):
 
 
 def create_file_names_list(
-    dir_path, sub_dir=False, ignore_copy=False, allowed_file_types=None
+    dir_path, sub_dir=False, ignore_copy=False, allowed_file_types=None, num_imgs=None
 ):
     file_list = []
-    for _, _, files in os.walk(dir_path):
-        file_list.extend(files)
-        if not sub_dir:
-            # Break after processing the top-level folder if not searching subfolders
+    counter = 0
+    for root, _, files in os.walk(dir_path):
+        for file_name in files:
+            if ignore_copy and "copy" in file_name.lower():
+                continue
+            if (
+                allowed_file_types is not None
+                and file_name.split(".")[-1].lower() not in allowed_file_types
+            ):
+                continue
+            file_list.append(file_name)
+            counter += 1
+            if num_imgs is not None and counter >= num_imgs:
+                break
+        if not sub_dir or (num_imgs is not None and counter >= num_imgs):
             break
-    if ignore_copy:
-        file_list = [
-            file_name for file_name in file_list if "copy" not in file_name.lower()
-        ]
-    if allowed_file_types is not None:
-        file_list = [
-            file_name
-            for file_name in file_list
-            if file_name.split(".")[-1].lower() in allowed_file_types
-        ]
+    if num_imgs is not None and len(file_list) < num_imgs:
+        print(
+            f"Only {len(file_list)} images found in the directory, less than the requested {num_imgs}."
+        )
+    if num_imgs is not None:
+        assert (
+            len(file_list) == num_imgs
+        ), f"Expected {num_imgs} images, got {len(file_list)}."
     return sorted(file_list)
 
 
@@ -98,7 +114,46 @@ def create_file_names_list_from_csv(
             print(
                 f"Only {len(file_list)} images found in the CSV file, less than the requested {num_imgs}."
             )
+    if num_imgs is not None:
+        assert (
+            len(file_list) == num_imgs
+        ), f"Expected {num_imgs} images, got {len(file_list)}."
     return file_list
+
+
+def filter_list_by_csv(
+    file_list, csv_file_path, filter_func, header=True, ignore_copy=False, num_imgs=None
+):
+    with open(csv_file_path, "r") as csv_file:
+        csv_reader = csv.reader(csv_file, delimiter=",")
+        if header:
+            try:
+                next(csv_reader)
+            except StopIteration:
+                print(f"Empty CSV file: {csv_file_path}")
+                return []
+        filtered_file_list = []
+        counter = 0
+        for row in csv_reader:
+            if num_imgs is not None and counter >= num_imgs:
+                print(f"{num_imgs} images added to list.")
+                break
+            if (
+                row[0] in file_list
+                and filter_func(row)
+                and (not ignore_copy or "copy" not in row[0].lower())
+            ):
+                filtered_file_list.append(row[0])
+                counter += 1
+        if num_imgs is not None and len(file_list) < num_imgs:
+            print(
+                f"Only {len(file_list)} images found in the CSV file, less than the requested {num_imgs}."
+            )
+    if num_imgs is not None:
+        assert (
+            len(filtered_file_list) == num_imgs
+        ), f"Expected {num_imgs} images, got {len(filtered_file_list)}."
+    return filtered_file_list
 
 
 def get_images_from_list(
@@ -108,8 +163,9 @@ def get_images_from_list(
     as_dict=False,
     ignore_copy=True,
     allowed_file_types=None,
+    num_imgs=None,
 ):
-    """Returns per default a list of file paths of the files in the given list. If as_dict is True, returns a list of dictionaries with the keys 'file_path', 'file_name' and 'imgage'."""
+    """Returns per default a list of file paths of the files in the given list. If as_dict is True, returns a list of dictionaries with the keys 'file_path', 'file_name' and 'image'."""
 
     def process_image(image_name, image_path):
         try:
@@ -127,6 +183,7 @@ def get_images_from_list(
             print(f"Error loading {image_name}: {e}")
 
     images = []
+    counter = 0
     # Traverse the folder and subfolders (if enabled)
     for root, _, files in os.walk(dir_path):
         if file_name_list is None:
@@ -139,6 +196,9 @@ def get_images_from_list(
                         continue
                 file_path = os.path.join(root, file_name)
                 images.append(process_image(file_name, file_path))
+                counter += 1
+                if num_imgs is not None and counter >= num_imgs:
+                    break
         else:
             file_name_list = sorted(file_name_list)
             for file_name in file_name_list:
@@ -150,8 +210,11 @@ def get_images_from_list(
                             continue
                     file_path = os.path.join(root, file_name)
                     images.append(process_image(file_name, file_path))
+                    counter += 1
+                    if num_imgs is not None and counter >= num_imgs:
+                        break
 
-        if not sub_dir:
+        if not sub_dir or (num_imgs is not None and counter >= num_imgs):
             # Break after processing the top-level folder if not searching subfolders
             break
 
@@ -161,16 +224,29 @@ def get_images_from_list(
     else:
         # Function to extract the numeric part from the filename
         def extract_number(path):
-            print(path)
             return int(re.search(r"(\d+)\.jpg$", path).group(1))
 
         # Sorting based on the extracted number
         images = sorted(images, key=extract_number)
+
+    if num_imgs is not None and len(images) < num_imgs:
+        print(
+            f"Only {len(images)} images found in the list, less than the requested {num_imgs}."
+        )
+    if num_imgs is not None:
+        assert (
+            len(images) == num_imgs
+        ), f"Expected {num_imgs} images, got {len(images)}."
     return images
 
 
 def get_images_from_directory(
-    dir_path, sub_dir=False, as_dict=False, ignore_copy=True, allowed_file_types=None
+    dir_path,
+    sub_dir=False,
+    as_dict=False,
+    ignore_copy=True,
+    allowed_file_types=None,
+    num_imgs=None,
 ):
     return get_images_from_list(
         None,
@@ -179,6 +255,7 @@ def get_images_from_directory(
         as_dict,
         ignore_copy,
         allowed_file_types=allowed_file_types,
+        num_imgs=num_imgs,
     )
 
 
@@ -247,6 +324,8 @@ def get_n_confounded_m_non_confounded_images(
         if n_confounded > n and n_non_confounded > m:
             break
 
+    assert len(confounded_images) == n
+    assert len(non_confounded_images) == m
     return confounded_images, non_confounded_images
 
 
