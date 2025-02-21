@@ -101,7 +101,7 @@ class Dataset:
             metadata = self.metadata
 
         # for testing:
-        reduced_set = True
+        reduced_set = False
         if reduced_set:
             metadata = metadata.sample(n=600, random_state=1)
         # for testing end
