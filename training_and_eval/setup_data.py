@@ -101,7 +101,7 @@ class Dataset:
             metadata = self.metadata
 
         # for testing:
-        reduced_set = False
+        reduced_set = True
         if reduced_set:
             metadata = metadata.sample(n=600, random_state=1)
         # for testing end
@@ -251,7 +251,9 @@ class Dataset:
 
         # load data
         print("Loading data...")
-        data_dict = self.load_data(augmented_images_dir, generated_masks_dir)
+        data_dict = self.load_data(
+            augmented_images_dir, augmented_gt_label_path, generated_masks_dir
+        )
 
         # get dataloaders and loss weights
         dataloaders = {}
