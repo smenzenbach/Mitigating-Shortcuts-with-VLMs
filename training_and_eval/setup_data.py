@@ -1,4 +1,5 @@
 import os
+from sympy import N
 import toml
 import yaml
 import h5py
@@ -61,7 +62,12 @@ class Dataset:
         images = transform(images)
         return images
 
-    def load_data(self, augmented_images_dir=None, generated_masks_dir=None):
+    def load_data(
+        self,
+        augmented_images_dir=None,
+        augmented_gt_label_path=None,
+        generated_masks_dir=None,
+    ):
         """
         Loads the original images, augmented images, ground truth wrong reason and right reason masks, generated masks (e.g. through our pipeline), class labels, and confounder labels. If model name is given the data gets preprocessed accordingly.
 
@@ -69,6 +75,8 @@ class Dataset:
         ----------
         augmented_images_dir : str
             Path to the augmented images directory.
+        augmented_gt_label_path : str
+            Path to the augmented ground truth label csv file. Not needed if augmented images are exchanged with original counterpart instead of added to original dataset.
         generated_masks_dir : str
             Path to the generated masks directory.
         """
@@ -79,35 +87,77 @@ class Dataset:
         else:
             size = (299, 299)
 
-        # get number of data entries
-        data_count = len(self.metadata)
-        print(f"Number of data entries: {data_count}")
-
-        # initialize arrays
-        original_images = np.empty((data_count, 3, size[0], size[1]))
-        augmented_images = np.empty((data_count, 3, size[0], size[1]))
-        wr_masks = np.zeros((data_count, 1, size[0], size[1]))
-        rr_masks = np.zeros((data_count, 1, size[0], size[1]))
-        gen_masks = np.zeros((data_count, 1, size[0], size[1]))
-        class_label = np.zeros(data_count).astype(np.int64)
-        confounder_label = np.zeros(data_count).astype(np.int64)
-
         # get list of inpainted files (to determine when to use raw or inpainted image) and list of mask files that are generated (e.g. through our pipeline)
         if augmented_images_dir is not None:
             list_augmented_files = create_file_names_list(augmented_images_dir)
         if generated_masks_dir is not None:
             list_mask_files = create_file_names_list(generated_masks_dir)
 
-        for i, row in tqdm(self.metadata.iterrows()):
+        # merge csv files self.metadata and aug_metadata
+        if augmented_gt_label_path is not None:
+            aug_metadata = pd.read_csv(augmented_gt_label_path)
+            metadata = pd.concat([self.metadata, aug_metadata], ignore_index=True)
+        else:
+            metadata = self.metadata
+
+        # for testing:
+        reduced_set = False
+        if reduced_set:
+            metadata = metadata.sample(n=600, random_state=1)
+        # for testing end
+
+        # get number of data entries
+        data_count_train = len(metadata[metadata["split"] == 0])
+        data_count_val = len(metadata[metadata["split"] == 1])
+        data_count_test = len(metadata[metadata["split"] == 2])
+        data_count = data_count_train + data_count_val + data_count_test
+        print(
+            f"Number of total data entries: {data_count}; train: {data_count_train}, val: {data_count_val}, test: {data_count_test}"
+        )
+
+        # initialize dict for train, val, test split with arrays for data
+        data_dict = {
+            "train": {
+                "images": np.empty((data_count_train, 3, size[0], size[1])),
+                "wr_masks": np.zeros((data_count_train, 1, size[0], size[1])),
+                "rr_masks": np.zeros((data_count_train, 1, size[0], size[1])),
+                "gen_masks": np.zeros((data_count_train, 1, size[0], size[1])),
+                "class_label": np.zeros(data_count_train).astype(np.int64),
+                "confounder_label": np.zeros(data_count_train).astype(np.int64),
+            },
+            "val": {
+                "images": np.empty((data_count_val, 3, size[0], size[1])),
+                "wr_masks": np.zeros((data_count_val, 1, size[0], size[1])),
+                "rr_masks": np.zeros((data_count_val, 1, size[0], size[1])),
+                "gen_masks": np.zeros((data_count_val, 1, size[0], size[1])),
+                "class_label": np.zeros(data_count_val).astype(np.int64),
+                "confounder_label": np.zeros(data_count_val).astype(np.int64),
+            },
+            "test": {
+                "images": np.empty((data_count_test, 3, size[0], size[1])),
+                "wr_masks": np.zeros((data_count_test, 1, size[0], size[1])),
+                "rr_masks": np.zeros((data_count_test, 1, size[0], size[1])),
+                "gen_masks": np.zeros((data_count_test, 1, size[0], size[1])),
+                "class_label": np.zeros(data_count_test).astype(np.int64),
+                "confounder_label": np.zeros(data_count_test).astype(np.int64),
+            },
+        }
+
+        # initialize indices (incremented before adding data)
+        train_ind = -1
+        val_ind = -1
+        test_ind = -1
+        for _, row in tqdm(metadata.iterrows()):
             # get paths
-            raw_img_path = os.path.join(self.raw_dir, row["filename"])
             if (
-                augmented_images_dir is not None
-                and row["filename"] in list_augmented_files
-            ):  # if augmented image exists, use it
-                augmented_img_path = os.path.join(augmented_images_dir, row["filename"])
-            else:
-                augmented_img_path = raw_img_path
+                augmented_images_dir is not None  # if augmented images are given
+                and row["filename"]
+                in list_augmented_files  # and file is in augmented images dir
+                and row["split"] == 0  # and file is in train split
+            ):  # then use augmented image
+                img_path = os.path.join(augmented_images_dir, row["filename"])
+            else:  # else use raw image
+                img_path = os.path.join(self.raw_dir, row["filename"])
             wr_mask_path = os.path.join(self.wr_masks_dir, row["filename"])
             rr_mask_path = os.path.join(self.rr_masks_dir, row["filename"])
             if generated_masks_dir is not None and row["filename"] in list_mask_files:
@@ -117,8 +167,7 @@ class Dataset:
                 mask_path = None
 
             # load images and masks
-            original_image = self.preprocess_data(self.load_image(raw_img_path))
-            augmented_image = self.preprocess_data(self.load_image(augmented_img_path))
+            image = self.preprocess_data(self.load_image(img_path))
             if os.path.exists(wr_mask_path):
                 wr_mask = self.load_mask(wr_mask_path, mask_size=size)
             else:
@@ -130,33 +179,38 @@ class Dataset:
             if mask_path is not None:
                 mask = self.load_mask(mask_path, mask_size=size, dilate=True)
 
-            # add data to arrays
-            original_images[i] = original_image
-            augmented_images[i] = augmented_image
-            if wr_mask is not None:  # if mask exists, set wr_mask
-                wr_masks[i] = wr_mask
-            if rr_mask is not None:  # if mask exists, set rr_mask
-                rr_masks[i] = rr_mask
-            if mask_path is not None:  # if None, gen_mask stays 0
-                gen_masks[i] = mask
-            class_label[i] = int(row["class_label"])
-            confounder_label[i] = int(row["confounder_label"])
+            # get key for split
+            if row["split"] == 0:
+                key = "train"
+                train_ind += 1
+                i = train_ind
+            elif row["split"] == 1:
+                key = "val"
+                val_ind += 1
+                i = val_ind
+            else:
+                key = "test"
+                test_ind += 1
+                i = test_ind
 
-        return (
-            original_images,
-            augmented_images,
-            wr_masks,
-            rr_masks,
-            gen_masks,
-            class_label,
-            confounder_label,
-        )
+            # add data to arrays
+            data_dict[key]["images"][i] = image
+            if wr_mask is not None:  # if mask exists, set wr_mask
+                data_dict[key]["wr_masks"][i] = wr_mask
+            if rr_mask is not None:  # if mask exists, set rr_mask
+                data_dict[key]["rr_masks"][i] = rr_mask
+            if mask_path is not None:  # if None, gen_mask stays 0
+                data_dict[key]["gen_masks"][i] = mask
+            data_dict[key]["class_label"][i] = int(row["class_label"])
+            data_dict[key]["confounder_label"][i] = int(row["confounder_label"])
+
+        return data_dict
 
     def load_dataloaders_and_loss_weights(
         self,
-        augmented_images_dir,
-        generated_masks_dir,
-        training_mode,
+        augmented_images_dir=None,
+        augmented_gt_label_path=None,
+        generated_masks_dir=None,
         batch_size=16,
     ):
         """Loads the data, builds the datasets, and returns the dataloaders and loss weights for the training and test sets.
@@ -173,10 +227,10 @@ class Dataset:
         ----------
         augmented_images_dir : str
             Path to the augmented images directory.
+        augmented_gt_label_path : str
+            Path to the augmented ground truth label csv file. Not needed if augmented images are exchanged with original counterpart instead of added to original dataset.
         generated_masks_dir : str
             Path to the generated masks directory.
-        training_mode : str
-            Training mode for the model. Options: Vanilla, Inpainting.
         """
 
         def calculate_loss_weights(counter):
@@ -197,102 +251,34 @@ class Dataset:
 
         # load data
         print("Loading data...")
-        (
-            original_images,
-            augmented_images,
-            wr_masks,
-            rr_masks,
-            gen_masks,
-            class_label,
-            confounder_label,
-        ) = self.load_data(augmented_images_dir, generated_masks_dir)
+        data_dict = self.load_data(augmented_images_dir, generated_masks_dir)
 
-        # Build datasets
-        print("Building datasets...")
-        if training_mode == "Vanilla":
-            dataset = TensorDataset(
-                torch.from_numpy(original_images).float(),
-                torch.from_numpy(class_label),
-                torch.from_numpy(confounder_label),
-                torch.from_numpy(wr_masks).float(),
-                torch.from_numpy(rr_masks).float(),
-                torch.from_numpy(gen_masks).float(),
-            )
-
-        elif training_mode == "Inpainting":
-            dataset = TensorDataset(
-                torch.from_numpy(augmented_images).float(),
-                torch.from_numpy(class_label),
-                torch.from_numpy(confounder_label),
-                torch.from_numpy(wr_masks).float(),
-                torch.from_numpy(rr_masks).float(),
-                torch.from_numpy(gen_masks).float(),
-            )
-
-        # Get split for train and test set
-        num_total = len(dataset)
-        num_train = int(0.8 * num_total)
-        num_test = int(0.1 * num_total)
-        num_val = num_total - num_train - num_test
-
-        # Split data and crate dataloaders
-        print("Splitting data and creating dataloaders...")
-        train_dataset, val_dataset, test_dataset = torch.utils.data.random_split(
-            dataset,
-            [num_train, num_val, num_test],
-            generator=torch.Generator().manual_seed(0),
-        )
-
-        train_indices = train_dataset.indices
-        val_indices = val_dataset.indices
-        test_indices = test_dataset.indices
-
-        print("Sizes of datasets:")
-        print(
-            f"TRAIN: {len(train_indices)}, VAL: {len(val_indices)}, TEST: {len(test_indices)}"
-        )
-
+        # get dataloaders and loss weights
         dataloaders = {}
         loss_weights = {}
+        for split_key in ["train", "val", "test"]:
+            print(f"\nBuilding dataset for {split_key} set...")
+            data = data_dict[split_key]
+            dataset = TensorDataset(
+                torch.from_numpy(data["images"]).float(),
+                torch.from_numpy(data["class_label"]),
+                torch.from_numpy(data["confounder_label"]),
+                torch.from_numpy(data["wr_masks"]).float(),
+                torch.from_numpy(data["rr_masks"]).float(),
+                torch.from_numpy(data["gen_masks"]).float(),
+            )
 
-        # train
+            classes = [x[1].item() for x in dataset]
+            confounder_dist = [x[2].item() for x in dataset]
 
-        train_classes = [x[1].item() for x in train_dataset]
-        train_confounder_dis = [x[2].item() for x in train_dataset]
+            dataloaders[split_key] = DataLoader(
+                dataset, batch_size=batch_size, shuffle=True
+            )
+            loss_weights[split_key] = calculate_loss_weights(Counter(classes))
 
-        dataloaders["train"] = DataLoader(
-            train_dataset, batch_size=batch_size, shuffle=True
-        )
-        loss_weights["train"] = calculate_loss_weights(Counter(train_classes))
-
-        print(f"\nTRAIN class dist: {Counter(train_classes)}")
-        print(f"TRAIN confounder dist: {Counter(train_confounder_dis)}")
-        print(f"TRAIN loss weights: {str(loss_weights['train'])}")
-
-        # val
-        val_classes = [x[1].item() for x in val_dataset]
-        val_confounder_dis = [x[2].item() for x in val_dataset]
-
-        dataloaders["val"] = DataLoader(
-            val_dataset, batch_size=batch_size, shuffle=True
-        )
-        loss_weights["val"] = calculate_loss_weights(Counter(train_classes))
-
-        print(f"\nVAL class dist: {Counter(val_classes)}")
-        print(f"VAL confounder dist: {Counter(val_confounder_dis)}")
-        print(f"VAL loss weights: {str(loss_weights['val'])}")
-
-        # test
-        test_classes = [x[1].item() for x in test_dataset]
-        test_confounder_dis = [x[2].item() for x in test_dataset]
-
-        dataloaders["test"] = DataLoader(
-            test_dataset, batch_size=batch_size, shuffle=True
-        )
-        loss_weights["test"] = calculate_loss_weights(Counter(train_classes))
-
-        print(f"\nTEST class dist: {Counter(test_classes)}")
-        print(f"TEST confounder dist: {Counter(test_confounder_dis)}")
-        print(f"TEST loss weights: {str(loss_weights['test'])}")
+            print(f"Number of samples in {split_key} set: {len(dataset)}")
+            print(f"{split_key.upper()} class dist: {Counter(classes)}")
+            print(f"{split_key.upper()} confounder dist: {Counter(confounder_dist)}")
+            print(f"{split_key.upper()} weights: {str(loss_weights[split_key])}\n")
 
         return dataloaders, loss_weights

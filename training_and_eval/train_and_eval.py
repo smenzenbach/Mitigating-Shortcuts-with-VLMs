@@ -10,27 +10,17 @@ import os
 
 from learner.learner import Learner
 
-# python train_and_eval.py -m Vanilla --dataset ISIC19 -d 1 --id eval_test
+# python train_and_eval.py --dataset ISIC19 -d 1 --id eval_test_vanilla
 
 parser = argparse.ArgumentParser(
     description="SHORTCUT MITIGATION THROUGH INPAINTING EVAL"
 )
-parser.add_argument(
-    "-m",
-    "--mode",
-    default="Vanilla",
-    type=str,
-    choices=[
-        "Vanilla",
-        "Inpainting",
-        # "RRR",
-    ],
-    help="Which mode for training?",
-)
-
 
 parser.add_argument(
-    "--dataset", choices=["ISIC19", "CelebA"], help="Which dataset should be used?"
+    "-ds",
+    "--dataset",
+    choices=["ISIC19", "CelebA"],
+    help="Which dataset should be used?",
 )
 
 parser.add_argument(
@@ -83,7 +73,6 @@ dataset = Dataset(dataset_name=args.dataset, model_name=args.model)
 dataloaders, loss_weights = dataset.load_dataloaders_and_loss_weights(
     augmented_images_dir=args.augmented_images_dir,
     generated_masks_dir=args.generated_masks_dir,
-    training_mode=args.mode,
     batch_size=BATCH_SIZE,
 )
 
@@ -103,7 +92,7 @@ logging.basicConfig(
     datefmt="%d/%m/%Y %H:%M:%S",
 )
 logging.info(
-    f"\n\n--------RPEXP Train {args.model}, base_criterion=CEL, dataset={args.dataset}, mode={args.mode}--------"
+    f"\n\n--------RPEXP Train {args.model}, base_criterion=CEL, dataset={args.dataset}--------"
 )
 logging.info(
     f"-HYPERPARAMS epochs= {EPOCHS}, batch_size={BATCH_SIZE}, lr={LR}, optim=SGD(momentum=0.9), save_last={SAVE_LAST}, seeds={SEED}, scheduler={SCHEDULER}, shuffle={TRAIN_SHUFFLE}"
@@ -118,7 +107,7 @@ if args.id is not None:
 else:
     identifier = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
-MODELNAME = f"{dataset.dataset_name}-{args.mode}-{identifier}"
+MODELNAME = f"{dataset.dataset_name}-{identifier}"
 
 if args.model == "vgg16":
     model = VGG16_pretrained(freeze_features=False).to(DEVICE)
