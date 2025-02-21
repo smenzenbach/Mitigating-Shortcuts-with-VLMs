@@ -432,9 +432,10 @@ def quantify_wr_rr_reason(
             norm_attr = norm_saliencies_fast(attr, positive_only=True)
             # filter out instances that have no seg mask
             if flags:
-                have_confounder_indices = torch.nonzero((flags_t == 1), as_tuple=True)[
-                    0
-                ]
+                have_confounder_indices = torch.nonzero(
+                    (flags_t == 1) & (torch.sum(masks_t, dim=(1, 2, 3)) != 0),
+                    as_tuple=True,
+                )[0]
                 norm_attr = norm_attr[have_confounder_indices]
                 masks_t = masks_t[have_confounder_indices]
                 tmp = len(have_confounder_indices)
