@@ -15,6 +15,7 @@ from tqdm import tqdm
 
 from utils import create_file_names_list, dilate_mask
 
+# todo: write logs
 
 # get dir of repo (parent dir)
 repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -38,6 +39,10 @@ class Dataset:
             gt_label_path
         )  # columns: filename, class_label, confounder_label
         self.model_name = model_name
+        # set worst-group label
+        self.worst_group_class_label = dataset_yaml[self.dataset_name][
+            "worst_group_class_label"
+        ]
 
     def load_image(self, img_path, image_size=None):
         """Loads an image using PIL and converts it to a NumPy array."""
@@ -282,5 +287,20 @@ class Dataset:
             print(f"{split_key.upper()} class dist: {Counter(classes)}")
             print(f"{split_key.upper()} confounder dist: {Counter(confounder_dist)}")
             print(f"{split_key.upper()} weights: {str(loss_weights[split_key])}\n")
+
+        # worst-group test set
+        worst_group_set = torch.utils.data.Subset(
+            dataloaders["test"].dataset,
+            [
+                i
+                for i, x in enumerate(dataloaders["test"].dataset)
+                if (x[1].item() == self.worst_group_class_label)
+                and (x[2].item() == 0)  # non-confounded
+            ],
+        )
+        dataloaders["worst_group_test"] = DataLoader(
+            worst_group_set, batch_size=batch_size, shuffle=True
+        )
+        print(f"Number of samples in worst group test set: {len(worst_group_set)}\n")
 
         return dataloaders, loss_weights

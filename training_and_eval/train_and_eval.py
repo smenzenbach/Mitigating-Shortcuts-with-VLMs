@@ -11,6 +11,8 @@ import os
 from learner.learner import Learner
 
 # python train_and_eval.py --dataset ISIC19 -d 1 --id eval_test_vanilla
+# python train_and_eval.py --dataset CelebA -d 1 --id vanilla
+# python train_and_eval.py --dataset CelebA --augmented_images_dir /workspace/home/pipeline_outputs/CelebA/lama_sdxl -d 1 --id lama_sdxl
 
 parser = argparse.ArgumentParser(
     description="SHORTCUT MITIGATION THROUGH INPAINTING EVAL"
@@ -76,10 +78,11 @@ dataloaders, loss_weights = dataset.load_dataloaders_and_loss_weights(
     batch_size=BATCH_SIZE,
 )
 
-train_dataloader, val_loader, test_dataloader = (
+train_dataloader, val_loader, test_dataloader, wg_test_dataloader = (
     dataloaders["train"],
     dataloaders["val"],
     dataloaders["test"],
+    dataloaders["worst_group_test"],
 )
 
 ########### Initalize model, loss and optimizer
@@ -144,6 +147,10 @@ if not args.load:
 # Accuracy
 learner.validation_statistics(test_dataloader)
 logging.info("Accuracy on test set DONE.")
+
+# Worst-group accuracy
+learner.validation_statistics(wg_test_dataloader)
+logging.info("Accuracy on worst-group test set DONE.")
 
 # WR
 learner.get_wr_metric(test_dataloader)
