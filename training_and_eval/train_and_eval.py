@@ -149,7 +149,7 @@ learner.validation_statistics(test_dataloader)
 logging.info("Accuracy on test set DONE.")
 
 # Worst-group accuracy
-learner.validation_statistics(wg_test_dataloader)
+learner.validation_statistics(wg_test_dataloader, worst_group=True)
 logging.info("Accuracy on worst-group test set DONE.")
 
 # WR
