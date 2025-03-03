@@ -1,7 +1,7 @@
 import numpy as np
 import yaml
 import pandas as pd
-import tqdm
+from tqdm import tqdm
 import os
 from PIL import Image
 import argparse
@@ -11,7 +11,7 @@ from model import InpaintingModel_GMCNN
 
 
 def augment_dataset(dataset_name, augmented_dir, model_path):
-    with open(f"/data/datasets.yaml", "r") as file:
+    with open(f"data/datasets.yaml", "r") as file:
         dataset_yaml = yaml.safe_load(file)
     # set raw and gt paths
     raw_dir = dataset_yaml[dataset_name]["raw_dir"]
@@ -25,6 +25,7 @@ def augment_dataset(dataset_name, augmented_dir, model_path):
 
     # load and modify dataset
     for i, row in tqdm(metadata.iterrows()):
+        confounder_label = int(row["confounder_label"])
         # check whether the example contains a shortcut and is in the training set
         if confounder_label == 0:
             continue
@@ -36,30 +37,38 @@ def augment_dataset(dataset_name, augmented_dir, model_path):
         wr_mask_path = os.path.join(wr_masks_dir, row["filename"])
 
         # load images and masks
-        image = np.array(Image.open(raw_img_path).convert("RGB"))
+        image = Image.open(raw_img_path).convert("RGB")
+        image = np.array(image.resize((299, 299), resample=Image.LANCZOS))
         if os.path.exists(wr_mask_path):
             wr_mask = np.array(Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
         else:
             continue  # no inpainting if there is no wr mask
-        confounder_label = int(row["confounder_label"])
 
         # generate inpainted image
         if confounder_label == 1:
-            new_img = model(image, wr_mask)
+            # reformat the image and the mask according to nauta et al.
+            mask = np.expand_dims(wr_mask, axis=(0,1)) 
+            img = np.transpose(image, [2, 0, 1])
+            img = np.expand_dims(img, axis=0)
+
+            h, w = img.shape[2:]
+            grid = 4
+            img = img[:, :, :h // grid * grid, :w // grid * grid]
+            mask = mask[:, :, :h // grid * grid, :w // grid * grid]
+
+            new_img = model.evaluate(img, mask)[0].transpose(1, 2, 0)
         
         # save the new img (under the same image as the original image)
         new_img_path = os.path.join(augmented_dir, row['filename'])
         Image.fromarray(new_img).save(new_img_path)
 
-        # TODO check whether the inpainting output is correct and in the correct format
-
 
 if __name__ == "__main__":
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Create inpainted images according to the method of Nauta et al. for a dataset")
-    parser.add_argument("dataset_name", type=str, help="Name of the dataset config")
-    parser.add_argument("augmented_dir", type=str, help="Path to the augmented directory")
-    parser.add_argument("model_dir", type=str, help="Path to the augmented directory")
+    parser.add_argument("--dataset_name", type=str, help="Name of the dataset config")
+    parser.add_argument("--augmented_dir", type=str, help="Path to the augmented directory", default="data/ISIC19/augmented")
+    parser.add_argument("--model_dir", type=str, help="Path to the augmented directory", default="create_datasets/nauta/GMCNN.pth")
 
     args = parser.parse_args()
 
