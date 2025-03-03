@@ -1,6 +1,7 @@
 torch
 torchvision
 scikit-learn
+opencv-python-headless
 pandas
 seaborn
 matplotlib

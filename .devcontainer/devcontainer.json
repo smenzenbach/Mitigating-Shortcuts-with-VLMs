@@ -6,13 +6,14 @@
     "dockerfile": "../.docker/Dockerfile",
     "context": "..",
     "args": {
-      "COMPOSE_PROJ_NAME": "shortcutvlm",
+      "COMPOSE_PROJ_NAME": "Mitigating-Shortcuts-with-VLMs",
       "KIND": "3.11"
     }
   },
   "mounts": [
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.gitconfig,target=/root/.gitconfig,type=bind,consistency=cached",
-    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/root/.ssh,type=bind,consistency=cached",
+    "source=/storage-01/datasets,target=/workspaces/Mitigating-Shortcuts-with-VLMs/datasets,type=bind",
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/root/.ssh,type=bind,consistency=cached"
   ],
   "remoteUser": "root", // More info: https://aka.ms/dev-containers-non-root
   "customizations": {
