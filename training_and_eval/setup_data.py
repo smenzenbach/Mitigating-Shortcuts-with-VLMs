@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 import torch
 from torch.utils.data import DataLoader
-from torchvision.models import VGG16_Weights
+from torchvision.models import VGG16_Weights, ResNet50_Weights
 from collections import Counter
 from tqdm import tqdm
 
@@ -69,6 +69,8 @@ class Dataset:
     def preprocess_data(self, images):
         if self.model_name == "vgg16":
             transform = VGG16_Weights.IMAGENET1K_V1.transforms()
+        elif self.model_name == "resnet50":
+            transform = ResNet50_Weights.IMAGENET1K_V2.transforms()
         images = transform(images)
         return images
 
@@ -97,6 +99,8 @@ class Dataset:
 
         # get desired size according to model (if model name is given)
         if self.model_name == "vgg16":
+            size = (224, 224)
+        elif self.model_name == "resnet50":
             size = (224, 224)
         else:
             size = (299, 299)
