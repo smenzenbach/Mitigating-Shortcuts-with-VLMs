@@ -10,3 +10,6 @@ __pycache__/
 **/training_and_eval/runs*
 **/training_and_eval/eval_output*
 **/training_and_eval/logs*
+
+# no h5 files
+*.h5
