@@ -10,3 +10,9 @@ __pycache__/
 **/training_and_eval/runs*
 **/training_and_eval/eval_output*
 **/training_and_eval/logs*
+
+# datasets
+**/datasets/*
+
+# augmented datasets
+**/augmented/*
