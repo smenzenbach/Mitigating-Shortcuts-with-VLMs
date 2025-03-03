@@ -15,7 +15,7 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 from rtpt import RTPT
 
-from utils import explain_with_ig_one_by_one, quantify_wr_rr_reason
+from utils import explain_with_ig_one_by_one, quantify_wr_rr_reason, MyLogger
 
 # get dir of repo (parent dir)
 repo_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -33,6 +33,7 @@ class Learner:
         modelname,
         load=False,
         base_criterion=F.cross_entropy,
+        logger=None,
     ):
         """
         Args:
@@ -53,7 +54,14 @@ class Learner:
         self.device = device
         self.modelname = modelname
         self.run_id = str(uuid.uuid1())
-        self.log_folder = f"{repo_dir}/training_and_eval/logs/" + self.modelname
+        # set up logger
+        logger_dir = f"{repo_dir}/training_and_eval/logs/training"
+        os.makedirs(logger_dir, exist_ok=True)
+        if logger is not None:
+            self.logger = logger
+        else:
+            self.logger = MyLogger(f"{logger_dir}/{self.modelname}.log")
+        self.train_logger = MyLogger(f"{logger_dir}/{self.modelname}-epoch_stats.log")
         self.writer = SummaryWriter(
             log_dir=f"{repo_dir}/training_and_eval/runs/"
             + self.modelname
@@ -64,7 +72,16 @@ class Learner:
         self.output_dir = f"{repo_dir}/training_and_eval/eval_output/{modelname}"
         os.makedirs(self.output_dir, exist_ok=True)
         if load:
-            self.load(modelname + ".pt")
+            # check if model exists
+            if os.path.exists(
+                f"{repo_dir}/training_and_eval/learner/model_store/" + modelname + ".pt"
+            ):
+                self.trained_epochs = self.load(modelname + ".pt")
+            else:
+                self.logger.warning("Model not found! Starting from scratch.")
+                self.trained_epochs = 0
+        else:
+            self.trained_epochs = 0
 
     def score(self, dataloader, criterion, verbose=False):
         """Returns the acc and loss on the specified dataloader."""
@@ -82,7 +99,9 @@ class Learner:
         test_loss /= size
         correct /= size
         if verbose:
-            print(f"Test Error: Acc: {100*correct:>0.1f}%, Avg loss: {test_loss:>8f}")
+            self.logger.info(
+                f"Test Error: Acc: {100*correct:>0.1f}%, Avg loss: {test_loss:>8f}"
+            )
         return 100 * correct, test_loss
 
     def save_learner(self, epochs=0, verbose=1, best=False):
@@ -104,7 +123,7 @@ class Learner:
             + ".pt",
         )
         if verbose == 1:
-            print("Model saved!")
+            self.logger.info(f"Model {self.modelname} saved!")
 
     def load(self, name):
         """Load the model with name from the model_store."""
@@ -113,16 +132,17 @@ class Learner:
             map_location=torch.device(self.device),
         )
         self.model.load_state_dict(checkpoint["weights"])
-        epochs_ = "none"
+        epochs_ = 0
         if "optimizer_dict" in checkpoint:
             self.optimizer.load_state_dict(checkpoint["optimizer_dict"])
         if "rng_state" in checkpoint:
             torch.set_rng_state(checkpoint["rng_state"].type(torch.ByteTensor))
         if "epochs" in checkpoint:
             epochs_ = checkpoint["epochs"]
-        print(
+        self.logger.info(
             f"Model {self.modelname} loaded! Was trained on {checkpoint['loss']} for {epochs_} epochs!"
         )
+        return epochs_
 
     def fit(
         self,
@@ -133,6 +153,7 @@ class Learner:
         save_last=True,
         verbose=True,
         verbose_after_n_epochs=1,
+        use_checkpoint=False,
     ):
         """
         Fits the learner using training data from dataloader for specified number
@@ -141,86 +162,101 @@ class Learner:
         Writes the training progress and stats per epoch in a logfile to the logs-folder.
 
         Args:
-            dataloader: train dataloader (X, y, expl) where expl are the ground-truth user
-                feedback masks (optional).
+            dataloader: train dataloader (X, y).
             val_dataloader: validation dataloader (Xt, yt).
             epochs: number of epochs to train.
             save_best: saves the best model on the train loss to file.
             save_last: saves the model after every epoch .
             verbose: set to False if you want no print outputs.
             verbose_after_n_epochs: print outputs after every n epochs.
+            use_checkpoint: if True, the model is loaded from the model_store
         """
-        print("Start training...")
-        with open(f"{self.log_folder}.log", "w") as f:
-            f.write("epoch,acc,loss,ra_loss,rr_loss,val_acc,val_loss,time\n")
-            best_val_loss = 100000
-            elapsed_time = 0
+        self.logger.info(f"Start training {self.modelname}...")
+        if use_checkpoint:
+            # check if already trained all epochs
+            self.logger.info(
+                f"Model {self.modelname} already trained {self.trained_epochs}/{epochs} epochs."
+            )
+            if self.trained_epochs >= epochs:
+                self.logger.info("Model already trained all epochs. Exiting training.")
+                return
+            start_epoch = self.trained_epochs + 1
+            self.train_logger.info(
+                "epoch,acc,loss,ra_loss,rr_loss,val_acc,val_loss,time\n"
+            )
+        else:
+            start_epoch = 1
+        best_val_loss = float("inf")
+        elapsed_time = 0
 
-            for epoch in range(1, epochs + 1):
-                # how_many_rawr_epoch = torch.tensor([0])
+        for epoch in range(start_epoch, epochs + 1):
+            # how_many_rawr_epoch = torch.tensor([0])
 
-                self.model.train()
-                size = len(dataloader.dataset)
-                train_loss, correct = 0, 0
-                start_time = time.time()
+            self.model.train()
+            size = len(dataloader.dataset)
+            train_loss, correct = 0, 0
+            start_time = time.time()
 
-                for batch, data in enumerate(dataloader):
-                    self.optimizer.zero_grad()
-                    # functionality to disable xil_loss for n number
-                    # of epochs beginning from first epoch
-                    X, y = data[0].to(self.device), data[1].to(self.device)
-                    output = self.model(X)
-                    loss = self.base_criterion(output, y)
+            for batch, data in enumerate(dataloader):
+                self.optimizer.zero_grad()
+                # functionality to disable xil_loss for n number
+                # of epochs beginning from first epoch
+                X, y = data[0].to(self.device), data[1].to(self.device)
+                output = self.model(X)
+                loss = self.base_criterion(output, y)
 
-                    # Backpropagation
-                    loss.backward()
-                    self.optimizer.step()
+                # Backpropagation
+                loss.backward()
+                self.optimizer.step()
 
-                    # for calculating loss, acc per epoch
-                    train_loss += loss.item()
-                    correct += (output.argmax(1) == y).type(torch.float).sum().item()
+                # for calculating loss, acc per epoch
+                train_loss += loss.item()
+                correct += (output.argmax(1) == y).type(torch.float).sum().item()
 
-                train_loss /= size
-                correct /= size
+            train_loss /= size
+            correct /= size
 
-                train_acc = 100.0 * correct
+            train_acc = 100.0 * correct
 
-                end_time = time.time()
-                elapsed_time_cur = end_time - start_time
-                elapsed_time += elapsed_time_cur
+            end_time = time.time()
+            elapsed_time_cur = end_time - start_time
+            elapsed_time += elapsed_time_cur
 
-                self.writer.add_scalar("Loss/train", train_loss, epoch)
-                self.writer.add_scalar("Acc/train", train_acc, epoch)
-                self.writer.add_scalar("Time/train", elapsed_time_cur, epoch)
+            self.writer.add_scalar("Loss/train", train_loss, epoch)
+            self.writer.add_scalar("Acc/train", train_acc, epoch)
+            self.writer.add_scalar("Time/train", elapsed_time_cur, epoch)
 
-                val_acc, val_loss = self.score(val_dataloader, self.base_criterion)
+            val_acc, val_loss = self.score(val_dataloader, self.base_criterion)
 
-                # printing acc and loss
-                if verbose and (epoch % verbose_after_n_epochs == 0):
-                    print(f"Epoch {epoch}| ", end="")
-                    print(
-                        f"Tests: accuracy: {(train_acc):>0.1f}%, loss: {train_loss:>8f} | ",
-                        end="",
-                    )
-                    print(f"Val: accuracy: {val_acc:>0.1f}%, loss: {val_loss:>8f}")
-                    # print(f" --number RAWR [{how_many_rawr_epoch}]")
-
-                # test acc on test set
-                self.writer.add_scalar("Loss/val", val_loss, epoch)
-                self.writer.add_scalar("Acc/val", val_acc, epoch)
-                # write in logfile -> we need the logfile to see plots in Jupyter notebooks
-                f.write(
-                    f"{epoch},{(train_acc):>0.1f},{train_loss:>8f},{(val_acc):>0.1f},{val_loss:>8f},{elapsed_time_cur:>0.4f}\n"
+            # printing acc and loss
+            if verbose and (epoch % verbose_after_n_epochs == 0):
+                print(f"Epoch {epoch}| ", end="")
+                print(
+                    f"Train: accuracy: {(train_acc):>0.1f}%, loss: {train_loss:>8f} | ",
+                    end="",
                 )
-                # save the current best model on val set
-                if save_best and val_loss < best_val_loss:
-                    best_val_loss = val_loss
-                    self.save_learner(verbose=False, best=True, epochs=epoch)
+                print(f"Val: accuracy: {val_acc:>0.1f}%, loss: {val_loss:>8f}")
+                # print(f" --number RAWR [{how_many_rawr_epoch}]")
 
-                if save_last:
-                    self.save_learner(verbose=False, epochs=epoch)
+            # test acc on test set
+            self.writer.add_scalar("Loss/val", val_loss, epoch)
+            self.writer.add_scalar("Acc/val", val_acc, epoch)
+            # write in logfile -> we need the logfile to see plots in Jupyter notebooks
+            self.logger.info(
+                f"Epoch {epoch} | Train: accuracy: {(train_acc):>0.1f}%, loss: {train_loss:>8f} | Val: accuracy: {val_acc:>0.1f}%, loss: {val_loss:>8f}"
+            )
+            self.train_logger.info(
+                f"{epoch},{(train_acc):>0.1f},{train_loss:>8f},{(val_acc):>0.1f},{val_loss:>8f},{elapsed_time_cur:>0.4f}\n"
+            )
+            # save the current best model on val set
+            if save_best and val_loss < best_val_loss:
+                best_val_loss = val_loss
+                self.save_learner(verbose=False, best=True, epochs=epoch)
 
-        print(f"--> Training took {elapsed_time:>4f} seconds!")
+            if save_last:
+                self.save_learner(verbose=False, epochs=epoch)
+
+        self.logger.info(f"Training took {elapsed_time:>4f} seconds!")
         self.writer.flush()
         self.writer.close()
 
@@ -285,13 +321,13 @@ class Learner:
 
     def get_wr_metric(self, dataloader):
         avg = []
-        explain_with_ig_one_by_one(
-            self.model,
-            dataloader,
-            save_name=f"{self.output_dir}/IG-activations",
-            next_to_each_other=True,  # was False
-            device=self.device,
-        )
+        # explain_with_ig_one_by_one(
+        #    self.model,
+        #    dataloader,
+        #    save_name=f"{self.output_dir}/IG-activations",
+        #    next_to_each_other=True,  # was False
+        #    device=self.device,
+        # )
 
         thresh = quantify_wr_rr_reason(
             dataloader,
@@ -317,7 +353,7 @@ class Learner:
         )
 
         f = open(f"{self.output_dir}/{self.modelname}-STATS-test-wr.txt", "w")
-        f.write(f"IG:\nmean:{np.mean(avg)}\n std:{np.std(avg)}")
+        f.write(f"IG:\n mean:{np.mean(avg)}\n std:{np.std(avg)}")
         f.close()
 
     def get_rr_metric(self, dataloader):
@@ -347,5 +383,5 @@ class Learner:
         )
 
         f = open(f"{self.output_dir}/{self.modelname}-STATS-test-rr.txt", "w")
-        f.write(f"IG:\nmean:{np.mean(avg)}\n std:{np.std(avg)}")
+        f.write(f"IG:\n mean:{np.mean(avg)}\n std:{np.std(avg)}")
         f.close()
