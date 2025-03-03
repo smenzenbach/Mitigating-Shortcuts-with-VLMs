@@ -52,19 +52,23 @@ parser.add_argument(
 )
 parser.add_argument("-l", "--load", action="store_true", help="If to load model")
 parser.add_argument(
-    "--model", default="vgg16", choices=["vgg16"], help="Which model should be used?"
+    "--model",
+    default="vgg16",
+    choices=["vgg16", "resnet50"],
+    help="Which model should be used?",
 )  # add more models
 parser.add_argument(
     "--id",
     default=None,
     help="ID to identify trained model. If None then timestamp is used.",
 )
+parser.add_argument("-bs", "--batch_size", default=16, type=int, help="Batch size")
 args = parser.parse_args()
 
 DEVICE = f"cuda:{args.device}"
 LR = 0.001
 SEED = 1
-BATCH_SIZE = 16
+BATCH_SIZE = args.batch_size
 TRAIN_SHUFFLE = True
 SAVE_LAST = True
 SCHEDULER = True
