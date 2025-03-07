@@ -1,7 +1,7 @@
 import numpy as np
 import yaml
 import pandas as pd
-import tqdm
+from tqdm import tqdm
 import os
 from PIL import Image
 import argparse
@@ -9,9 +9,8 @@ import utils
 import csv
 import random
 
-
 def augment_dataset(dataset_name, augmented_dir, no_class_change):
-    with open(f"/data/datasets.yaml", "r") as file:
+    with open(f"data/datasets.yaml", "r") as file:
         dataset_yaml = yaml.safe_load(file)
     # set raw and gt paths
     raw_dir = dataset_yaml[dataset_name]["raw_dir"]
@@ -26,19 +25,15 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         # only add modify spurious objects (but always)
         sampling_probs = {'B2M': 1, 'B2S': 0, 'M2N': 0, 'S2N': 1, 'N2M': 0, 'N2S': 1, 'M2B': 1, 'S2B': 0}
     else:
-        sampling_probs = utils.get_sampling_probabilities(groups)
+        sampling_probs = utils.compute_augmentations(groups)
 
     augmented_csv_info = []
 
     # iterate over all images from the respective categories
     for file_name in groups['both']:
         # check whether any augmentation is going to be applied:
-        if np.random.rand() <= sampling_probs['B2M']:
-            # remove a confounder
-            rm_conf = True
-        if np.random.rand() <= sampling_probs['B2S']:
-            # remove a class label
-            rm_class = True
+        rm_conf = np.random.rand() <= sampling_probs['B2M']
+        rm_class = np.random.rand() <= sampling_probs['B2S']
         if not rm_conf and not rm_class:
             continue
 
@@ -47,7 +42,8 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         wr_mask_path = os.path.join(wr_masks_dir, file_name)
         rr_mask_path = os.path.join(rr_masks_dir, file_name)
 
-        image = np.array(Image.open(raw_img_path).convert("RGB"))
+        image = Image.open(raw_img_path).convert("RGB")
+        image = np.array(image.resize((299, 299), resample=Image.LANCZOS))
         if os.path.exists(wr_mask_path):
             wr_mask = np.array(Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
         else:
@@ -61,11 +57,11 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         aug_class_labels = []
         aug_confounder_labels = []
         # create one augmented version with rr and wr removed if it exists
-        if rm_conf == 1:
+        if rm_conf:
             aug_imgs.append(utils.remove_object(image, wr_mask))
             aug_class_labels.append(1)
             aug_confounder_labels.append(0)
-        if rm_class == 1:
+        if rm_class:
             aug_imgs.append(utils.remove_object(image, rr_mask))
             aug_class_labels.append(0)
             aug_confounder_labels.append(1)
@@ -73,17 +69,13 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         # save the new images
         for i, aug_img in enumerate(aug_imgs):
             new_img_path = os.path.join(augmented_dir, f"{file_name[:-4]}_aug_{i}.jpg")
-            Image.fromarray(aug_img).save(new_img_path)
+            aug_img.save(new_img_path)
             augmented_csv_info.append({'filename': f'{file_name[:-4]}_aug_{i}.jpg', 'class_label': aug_class_labels[i], 'confounder_label': aug_confounder_labels[i], 'split': 0})
 
     for file_name in groups['just_class']:
         # check whether any augmentation is going to be applied:
-        if np.random.rand() <= sampling_probs['M2N']:
-            # remove the class
-            rm_class = True
-        if np.random.rand() <= sampling_probs['M2B']:
-            # add a confounder
-            add_conf = True
+        rm_class = np.random.rand() <= sampling_probs['M2N']
+        add_conf = np.random.rand() <= sampling_probs['M2B']
         if not add_conf and not rm_class:
             continue
 
@@ -92,7 +84,9 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         wr_mask_path = os.path.join(wr_masks_dir, file_name)
         rr_mask_path = os.path.join(rr_masks_dir, file_name)
 
-        image = np.array(Image.open(raw_img_path).convert("RGB"))
+        image = Image.open(raw_img_path).convert("RGB")
+        image = np.array(image.resize((299, 299), resample=Image.LANCZOS))
+
         if os.path.exists(wr_mask_path):
             wr_mask = np.array(Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
         else:
@@ -106,16 +100,17 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         aug_class_labels = []
         aug_confounder_labels = []
         # create one augmented version with rr and wr removed if it exists
-        if add_conf == 1:
+        if add_conf:
             # select a random image wich contains a confounder
             reference_image_name = random.choice(groups['confounded'])
             # load reference image and mask
-            ref_image = np.array(Image.open(os.path.join(raw_dir, reference_image_name)))
-            ref_mask = np.array(Image.open(os.path.join(wr_masks_dir, reference_image_name))) 
+            ref_image = Image.open(os.path.join(raw_dir, reference_image_name)).convert("RGB")
+            ref_image = np.array(ref_image.resize((299, 299), resample=Image.LANCZOS))
+            ref_mask = np.array(Image.open(os.path.join(wr_masks_dir, reference_image_name)).convert("L").point(lambda x: 0 if x < 128 else 255)) 
             aug_imgs.append(utils.add_object(image, ref_mask, ref_image))
             aug_class_labels.append(1)
             aug_confounder_labels.append(1)
-        if rm_class == 1:
+        if rm_class:
             aug_imgs.append(utils.remove_object(image, rr_mask))
             aug_class_labels.append(0)
             aug_confounder_labels.append(0)
@@ -123,18 +118,13 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         # save the new images
         for i, aug_img in enumerate(aug_imgs):
             new_img_path = os.path.join(augmented_dir, f"{file_name[:-4]}_aug_{i}.jpg")
-            Image.fromarray(aug_img).save(new_img_path)
+            aug_img.save(new_img_path)
             augmented_csv_info.append({'filename': f'{file_name[:-4]}_aug_{i}.jpg', 'class_label': aug_class_labels[i], 'confounder_label': aug_confounder_labels[i], 'split': 0})
-
 
     for file_name in groups['just_confounded']:
         # check whether any augmentation is going to be applied:
-        if np.random.rand() <= sampling_probs['S2N']:
-            # remove the confounder
-            rm_conf = True
-        if np.random.rand() <= sampling_probs['S2B']:
-            # add the class
-            add_class = True
+        rm_conf = np.random.rand() <= sampling_probs['S2N']
+        add_class = np.random.rand() <= sampling_probs['S2B']
         if not rm_conf and not add_class:
             continue
 
@@ -143,7 +133,8 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         wr_mask_path = os.path.join(wr_masks_dir, file_name)
         rr_mask_path = os.path.join(rr_masks_dir, file_name)
 
-        image = np.array(Image.open(raw_img_path).convert("RGB"))
+        image = Image.open(raw_img_path).convert("RGB")
+        image = np.array(image.resize((299, 299), resample=Image.LANCZOS))
         if os.path.exists(wr_mask_path):
             wr_mask = np.array(Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
         else:
@@ -153,20 +144,22 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         else:
             rr_mask = None
 
+        print(file_name)
         aug_imgs = []
         aug_class_labels = []
         aug_confounder_labels = []
         # create one augmented version with rr and wr removed if it exists
-        if rm_conf == 1:
+        if rm_conf:
             aug_imgs.append(utils.remove_object(image, wr_mask))
             aug_class_labels.append(0)
             aug_confounder_labels.append(0)
-        if add_class == 1:
+        if add_class:
             # select a random image wich contains the class
             reference_image_name = random.choice(groups['class'], 1)
-            # load reference image and mask
-            ref_image = np.array(Image.open(os.path.join(raw_dir, reference_image_name)))
-            ref_mask = np.array(Image.open(os.path.join(rr_masks_dir, reference_image_name))) 
+            # load reference image and mask     
+            ref_image = Image.open(os.path.join(raw_dir, reference_image_name)).convert("RGB")
+            ref_image = np.array(ref_image.resize((299, 299), resample=Image.LANCZOS))
+            ref_mask = np.array(Image.open(os.path.join(rr_masks_dir, reference_image_name)).convert("L").point(lambda x: 0 if x < 128 else 255)) 
             aug_imgs.append(utils.add_object(image, ref_mask, ref_image))
             aug_class_labels.append(1)
             aug_confounder_labels.append(1)
@@ -174,17 +167,13 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         # save the new images
         for i, aug_img in enumerate(aug_imgs):
             new_img_path = os.path.join(augmented_dir, f"{file_name[:-4]}_aug_{i}.jpg")
-            Image.fromarray(aug_img).save(new_img_path)
+            aug_img.save(new_img_path)
             augmented_csv_info.append({'filename': f'{file_name[:-4]}_aug_{i}.jpg', 'class_label': aug_class_labels[i], 'confounder_label': aug_confounder_labels[i], 'split': 0})
 
     for file_name in groups['neither']:
         # check whether any augmentation is going to be applied:
-        if np.random.rand() <= sampling_probs['N2S']:
-            # remove the confounder
-            add_conf = True
-        if np.random.rand() <= sampling_probs['N2M']:
-            # add the class
-            add_class = True
+        add_conf = np.random.rand() <= sampling_probs['N2S']
+        add_class = np.random.rand() <= sampling_probs['N2M']
         if not add_conf and not add_class:
             continue
 
@@ -193,7 +182,8 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         wr_mask_path = os.path.join(wr_masks_dir, file_name)
         rr_mask_path = os.path.join(rr_masks_dir, file_name)
 
-        image = np.array(Image.open(raw_img_path).convert("RGB"))
+        image = Image.open(raw_img_path).convert("RGB")
+        image = np.array(image.resize((299, 299), resample=Image.LANCZOS))
         if os.path.exists(wr_mask_path):
             wr_mask = np.array(Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
         else:
@@ -207,21 +197,23 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         aug_class_labels = []
         aug_confounder_labels = []
         # create one augmented version with rr and wr removed if it exists
-        if add_conf == 1:
+        if add_conf:
             # select a random image wich contains a confounder
             reference_image_name = random.choice(groups['confounded'])
             # load reference image and mask
-            ref_image = np.array(Image.open(os.path.join(raw_dir, reference_image_name)))
-            ref_mask = np.array(Image.open(os.path.join(wr_masks_dir, reference_image_name))) 
+            ref_image = Image.open(os.path.join(raw_dir, reference_image_name)).convert("RGB")
+            ref_image = np.array(ref_image.resize((299, 299), resample=Image.LANCZOS))
+            ref_mask = np.array(Image.open(os.path.join(wr_masks_dir, reference_image_name)).convert("L").point(lambda x: 0 if x < 128 else 255)) 
             aug_imgs.append(utils.add_object(image, ref_mask, ref_image))
             aug_class_labels.append(0)
             aug_confounder_labels.append(1)
-        if add_class == 1:
+        if add_class:
             # select a random image wich contains a confounder
             reference_image_name = random.choice(groups['class'])
             # load reference image and mask
-            ref_image = np.array(Image.open(os.path.join(raw_dir, reference_image_name)))
-            ref_mask = np.array(Image.open(os.path.join(rr_masks_dir, reference_image_name))) 
+            ref_image = Image.open(os.path.join(raw_dir, reference_image_name)).convert("RGB")
+            ref_image = np.array(ref_image.resize((299, 299), resample=Image.LANCZOS))
+            ref_mask = np.array(Image.open(os.path.join(rr_masks_dir, reference_image_name)).convert("L").point(lambda x: 0 if x < 128 else 255)) 
             aug_imgs.append(utils.add_object(image, ref_mask, ref_image))
             aug_class_labels.append(1)
             aug_confounder_labels.append(0)
@@ -229,7 +221,7 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         # save the new images
         for i, aug_img in enumerate(aug_imgs):
             new_img_path = os.path.join(augmented_dir, f"{file_name[:-4]}_aug_{i}.jpg")
-            Image.fromarray(aug_img).save(new_img_path)
+            aug_img.save(new_img_path)
             augmented_csv_info.append({'filename': f'{file_name[:-4]}_aug_{i}.jpg', 'class_label': aug_class_labels[i], 'confounder_label': aug_confounder_labels[i], 'split': 0})
     
     with open(os.path.join(augmented_dir, "gt_labels.csv"), mode="w", newline="") as file:
@@ -244,9 +236,9 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
 if __name__ == "__main__":
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Create an augmented version of the dataset for Spire")
-    parser.add_argument("dataset_name", type=str, help="Name of the dataset config")
-    parser.add_argument("augmented_dir", type=str, help="Path to the augmented directory")
-    parser.add_argument("--no_class_change", action="store_true", help="Whether the class attribute can be modified by Spire")
+    parser.add_argument("--dataset_name", type=str, help="Name of the dataset config", default="ISIC19")
+    parser.add_argument("--augmented_dir", type=str, help="Path to the augmented directory", default="data/ISIC19/augmented/spire")
+    parser.add_argument("-no_class_change", action="store_true", help="Whether the class attribute can be modified by Spire", default=True)
 
     args = parser.parse_args()
 
