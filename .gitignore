@@ -16,3 +16,10 @@ __pycache__/
 
 # augmented datasets
 **/augmented/*
+
+# masks
+**/rr_masks/*
+**/wr_masks/*
+
+# no models
+*.pth
