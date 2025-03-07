@@ -1,21 +1,17 @@
 import os
-from sympy import N
-import toml
 import yaml
 import h5py
 import pandas as pd
 import numpy as np
 from PIL import Image
 import torch
-from torch.utils.data import DataLoader, TensorDataset
-from torchvision.models import VGG16_Weights
+from torch.utils.data import DataLoader
+from torchvision.models import VGG16_Weights, ResNet50_Weights
 from collections import Counter
 from tqdm import tqdm
 
 
-from utils import create_file_names_list, dilate_mask
-
-# todo: write logs
+from utils import create_file_names_list, dilate_mask, MyLogger
 
 # get dir of repo (parent dir)
 repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,7 +22,7 @@ class Dataset:
         # get dataset name and yaml for raw and gt paths
         self.dataset_name = dataset_name
         with open(
-            f"{repo_dir}/data/datasets.yaml", "r"
+            f"{repo_dir}/data/datasets_info.yaml", "r"
         ) as file:  # adapt path later if repo is ready (without worksopace/home)
             dataset_yaml = yaml.safe_load(file)
         # set raw and gt paths
@@ -43,6 +39,15 @@ class Dataset:
         self.worst_group_class_label = dataset_yaml[self.dataset_name][
             "worst_group_class_label"
         ]
+        self.h5_dir = f"{repo_dir}/training_and_eval/h5_files/{self.dataset_name}"
+        os.makedirs(self.h5_dir, exist_ok=True)
+        # set logger
+        self.logger = MyLogger(
+            f"{repo_dir}/training_and_eval/logs/data_setup.log"
+        ).logger
+        self.logger.info(
+            f"Dataset {self.dataset_name} initialized for model {self.model_name}."
+        )
 
     def load_image(self, img_path, image_size=None):
         """Loads an image using PIL and converts it to a NumPy array."""
@@ -64,20 +69,26 @@ class Dataset:
     def preprocess_data(self, images):
         if self.model_name == "vgg16":
             transform = VGG16_Weights.IMAGENET1K_V1.transforms()
+        elif self.model_name == "resnet50":
+            transform = ResNet50_Weights.IMAGENET1K_V2.transforms()
         images = transform(images)
         return images
 
-    def load_data(
+    def load_data_generator(
         self,
+        split_key,
         augmented_images_dir=None,
         augmented_gt_label_path=None,
         generated_masks_dir=None,
+        return_length=False,
     ):
         """
         Loads the original images, augmented images, ground truth wrong reason and right reason masks, generated masks (e.g. through our pipeline), class labels, and confounder labels. If model name is given the data gets preprocessed accordingly.
 
         Parameters:
         ----------
+        split_key : str
+            Key for the split (train, val, test).
         augmented_images_dir : str
             Path to the augmented images directory.
         augmented_gt_label_path : str
@@ -89,14 +100,18 @@ class Dataset:
         # get desired size according to model (if model name is given)
         if self.model_name == "vgg16":
             size = (224, 224)
+        elif self.model_name == "resnet50":
+            size = (224, 224)
         else:
             size = (299, 299)
 
         # get list of inpainted files (to determine when to use raw or inpainted image) and list of mask files that are generated (e.g. through our pipeline)
         if augmented_images_dir is not None:
             list_augmented_files = create_file_names_list(augmented_images_dir)
+            print(f"Found {len(list_augmented_files)} augmented images.")
         if generated_masks_dir is not None:
             list_mask_files = create_file_names_list(generated_masks_dir)
+            print(f"Found {len(list_mask_files)} generated masks.")
 
         # merge csv files self.metadata and aug_metadata
         if augmented_gt_label_path is not None:
@@ -108,7 +123,7 @@ class Dataset:
         # for testing:
         reduced_set = False
         if reduced_set:
-            metadata = metadata.sample(n=600, random_state=1)
+            metadata = metadata.sample(n=10000, random_state=1)
         # for testing end
 
         # get number of data entries
@@ -120,105 +135,323 @@ class Dataset:
             f"Number of total data entries: {data_count}; train: {data_count_train}, val: {data_count_val}, test: {data_count_test}"
         )
 
-        # initialize dict for train, val, test split with arrays for data
-        data_dict = {
-            "train": {
-                "images": np.empty((data_count_train, 3, size[0], size[1])),
-                "wr_masks": np.zeros((data_count_train, 1, size[0], size[1])),
-                "rr_masks": np.zeros((data_count_train, 1, size[0], size[1])),
-                "gen_masks": np.zeros((data_count_train, 1, size[0], size[1])),
-                "class_label": np.zeros(data_count_train).astype(np.int64),
-                "confounder_label": np.zeros(data_count_train).astype(np.int64),
-            },
-            "val": {
-                "images": np.empty((data_count_val, 3, size[0], size[1])),
-                "wr_masks": np.zeros((data_count_val, 1, size[0], size[1])),
-                "rr_masks": np.zeros((data_count_val, 1, size[0], size[1])),
-                "gen_masks": np.zeros((data_count_val, 1, size[0], size[1])),
-                "class_label": np.zeros(data_count_val).astype(np.int64),
-                "confounder_label": np.zeros(data_count_val).astype(np.int64),
-            },
-            "test": {
-                "images": np.empty((data_count_test, 3, size[0], size[1])),
-                "wr_masks": np.zeros((data_count_test, 1, size[0], size[1])),
-                "rr_masks": np.zeros((data_count_test, 1, size[0], size[1])),
-                "gen_masks": np.zeros((data_count_test, 1, size[0], size[1])),
-                "class_label": np.zeros(data_count_test).astype(np.int64),
-                "confounder_label": np.zeros(data_count_test).astype(np.int64),
-            },
-        }
+        split_dict = {"train": 0, "val": 1, "test": 2}
 
-        # initialize indices (incremented before adding data)
-        train_ind = -1
-        val_ind = -1
-        test_ind = -1
-        for _, row in tqdm(metadata.iterrows()):
-            # get paths
-            if (
-                augmented_images_dir is not None  # if augmented images are given
-                and row["filename"]
-                in list_augmented_files  # and file is in augmented images dir
-                and row["split"] == 0  # and file is in train split
-            ):  # then use augmented image
-                img_path = os.path.join(augmented_images_dir, row["filename"])
-            else:  # else use raw image
-                img_path = os.path.join(self.raw_dir, row["filename"])
-            wr_mask_path = os.path.join(self.wr_masks_dir, row["filename"])
-            rr_mask_path = os.path.join(self.rr_masks_dir, row["filename"])
-            if generated_masks_dir is not None and row["filename"] in list_mask_files:
-                # if generated mask exists, use it
-                mask_path = os.path.join(generated_masks_dir, row["filename"])
-            else:
-                mask_path = None
+        # get number of data entries for split
+        split_count = len(
+            metadata[metadata["split"] == split_dict.get(split_key, split_key)]
+        )
 
-            # load images and masks
-            image = self.preprocess_data(self.load_image(img_path))
-            if os.path.exists(wr_mask_path):
-                wr_mask = self.load_mask(wr_mask_path, mask_size=size)
-            else:
-                wr_mask = None
-            if os.path.exists(rr_mask_path):
-                rr_mask = self.load_mask(rr_mask_path, mask_size=size)
-            else:
-                rr_mask = None
-            if mask_path is not None:
-                mask = self.load_mask(mask_path, mask_size=size, dilate=True)
+        # create a generator function for data
+        def data_generator():
+            split = split_dict.get(
+                split_key, split_key
+            )  # if split is string, get the corresponding int, else keep int
+            for _, row in metadata[metadata["split"] == split].iterrows():
+                if (
+                    augmented_images_dir is not None
+                    and row["filename"] in list_augmented_files
+                    and row["split"] == 0
+                ):
+                    img_path = os.path.join(augmented_images_dir, row["filename"])
+                else:
+                    img_path = os.path.join(self.raw_dir, row["filename"])
+                    if not os.path.exists(img_path):
+                        # Check if the file is in a subdirectory of raw_dir
+                        # TODO: this is too slow for large datasets how can I handle sub_dirs?
+                        found = False
+                        for root, _, files in os.walk(self.raw_dir):
+                            if row["filename"] in files:
+                                img_path = os.path.join(root, row["filename"])
+                                found = True
+                                break
+                        if not found:
+                            raise FileNotFoundError(
+                                f"File {row['filename']} not found in {self.raw_dir} or its subdirectories."
+                            )
+                wr_mask_path = os.path.join(self.wr_masks_dir, row["filename"])
+                rr_mask_path = os.path.join(self.rr_masks_dir, row["filename"])
+                if (
+                    generated_masks_dir is not None
+                    and row["filename"] in list_mask_files
+                ):
+                    mask_path = os.path.join(generated_masks_dir, row["filename"])
+                else:
+                    mask_path = None
 
-            # get key for split
-            if row["split"] == 0:
-                key = "train"
-                train_ind += 1
-                i = train_ind
-            elif row["split"] == 1:
-                key = "val"
-                val_ind += 1
-                i = val_ind
-            else:
-                key = "test"
-                test_ind += 1
-                i = test_ind
+                # load images and masks
+                image = self.preprocess_data(self.load_image(img_path))
+                wr_mask = (
+                    self.load_mask(wr_mask_path, mask_size=size)
+                    if os.path.exists(wr_mask_path)
+                    else np.zeros(size)
+                )
+                rr_mask = (
+                    self.load_mask(rr_mask_path, mask_size=size)
+                    if os.path.exists(rr_mask_path)
+                    else np.zeros(size)
+                )
+                mask = (
+                    self.load_mask(mask_path, mask_size=size, dilate=True)
+                    if mask_path is not None
+                    else np.zeros(size)
+                )
 
-            # add data to arrays
-            data_dict[key]["images"][i] = image
-            if wr_mask is not None:  # if mask exists, set wr_mask
-                data_dict[key]["wr_masks"][i] = wr_mask
-            if rr_mask is not None:  # if mask exists, set rr_mask
-                data_dict[key]["rr_masks"][i] = rr_mask
-            if mask_path is not None:  # if None, gen_mask stays 0
-                data_dict[key]["gen_masks"][i] = mask
-            data_dict[key]["class_label"][i] = int(row["class_label"])
-            data_dict[key]["confounder_label"][i] = int(row["confounder_label"])
+                yield {
+                    "image": image,
+                    "wr_mask": wr_mask,
+                    "rr_mask": rr_mask,
+                    "gen_mask": mask,
+                    "class_label": int(row["class_label"]),
+                    "confounder_label": int(row["confounder_label"]),
+                }
 
-        return data_dict
+        if return_length:
+            return data_generator(), split_count
+        return data_generator()
 
-    def load_dataloaders_and_loss_weights(
+    def create_h5_file(
         self,
+        identifier,
+        split_key,
         augmented_images_dir=None,
         augmented_gt_label_path=None,
         generated_masks_dir=None,
-        batch_size=16,
+        batch_size=200,
     ):
-        """Loads the data, builds the datasets, and returns the dataloaders and loss weights for the training and test sets.
+        """
+        Loads the data and creates h5_files for train, val, and test splits.
+        Ensures batches are appended to existing datasets without overwriting.
+        """
+
+        self.logger.info(
+            f"Creating h5 file for '{split_key}' split for identifier '{identifier}'."
+        )
+
+        # Ensure output directory exists
+        os.makedirs(os.path.join(self.h5_dir, identifier), exist_ok=True)
+
+        h5_file_path = os.path.join(self.h5_dir, identifier, f"{split_key}_data.h5")
+        with h5py.File(h5_file_path, "a") as f:
+            # We will lazily create the datasets once we have seen the first sample.
+            datasets_initialized = False
+
+            # Temporary buffers for accumulating one batch worth of data
+            images_batch = []
+            class_batch = []
+            confounder_batch = []
+            wr_masks_batch = []
+            rr_masks_batch = []
+            gen_masks_batch = []
+
+            # Get a generator for the current split
+            gen, split_count = self.load_data_generator(
+                split_key,
+                augmented_images_dir,
+                augmented_gt_label_path,
+                generated_masks_dir,
+                return_length=True,
+            )
+
+            if gen is None:
+                self.logger.warning(f"No data found for split: {split_key}")
+
+            self.logger.info(f"Processing {split_count} samples for split: {split_key}")
+
+            for sample in tqdm(
+                gen, desc=f"Processing {split_key} data", total=split_count
+            ):
+                # Append sample data to buffers
+                images_batch.append(sample["image"])
+                class_batch.append(sample["class_label"])
+                confounder_batch.append(sample["confounder_label"])
+                wr_masks_batch.append(sample["wr_mask"])
+                rr_masks_batch.append(sample["rr_mask"])
+                gen_masks_batch.append(sample["gen_mask"])
+
+                # If we've collected a full batch, write to HDF5
+                if len(images_batch) == batch_size:
+                    # Initialize datasets on the first batch
+                    if not datasets_initialized:
+                        # Determine shapes from the first sample in the batch
+                        image_shape = np.array(sample["image"]).shape  # e.g., (3, H, W)
+                        # Assuming masks are 2D; we add a channel dimension to get (1, H, W)
+                        mask_shape = np.array(sample["wr_mask"]).shape
+                        # Create datasets with initial shape (0, ...)
+                        f.create_dataset(
+                            "images",
+                            shape=(0, *image_shape),
+                            maxshape=(None, *image_shape),
+                            chunks=True,
+                            dtype="float32",
+                        )
+                        f.create_dataset(
+                            "class_label",
+                            shape=(0,),
+                            maxshape=(None,),
+                            chunks=True,
+                            dtype="int64",
+                        )
+                        f.create_dataset(
+                            "confounder_label",
+                            shape=(0,),
+                            maxshape=(None,),
+                            chunks=True,
+                            dtype="int64",
+                        )
+                        f.create_dataset(
+                            "wr_masks",
+                            shape=(0, 1, *mask_shape),
+                            maxshape=(None, 1, *mask_shape),
+                            chunks=True,
+                            dtype="float32",
+                        )
+                        f.create_dataset(
+                            "rr_masks",
+                            shape=(0, 1, *mask_shape),
+                            maxshape=(None, 1, *mask_shape),
+                            chunks=True,
+                            dtype="float32",
+                        )
+                        f.create_dataset(
+                            "gen_masks",
+                            shape=(0, 1, *mask_shape),
+                            maxshape=(None, 1, *mask_shape),
+                            chunks=True,
+                            dtype="float32",
+                        )
+                        datasets_initialized = True
+
+                    # Convert buffers to numpy arrays
+                    images_batch_np = np.array(images_batch, dtype="float32")
+                    class_batch_np = np.array(class_batch, dtype="int64")
+                    confounder_batch_np = np.array(confounder_batch, dtype="int64")
+                    wr_masks_batch_np = np.array(wr_masks_batch, dtype="float32")
+                    rr_masks_batch_np = np.array(rr_masks_batch, dtype="float32")
+                    gen_masks_batch_np = np.array(gen_masks_batch, dtype="float32")
+
+                    # Get current length of datasets to know where to append new data
+                    cur_len = f["images"].shape[0]
+                    new_len = cur_len + images_batch_np.shape[0]
+
+                    # Resize and append data for each dataset
+                    f["images"].resize((new_len, *f["images"].shape[1:]))
+                    f["images"][cur_len:new_len] = images_batch_np
+
+                    f["class_label"].resize((new_len,))
+                    f["class_label"][cur_len:new_len] = class_batch_np
+
+                    f["confounder_label"].resize((new_len,))
+                    f["confounder_label"][cur_len:new_len] = confounder_batch_np
+
+                    f["wr_masks"].resize((new_len, *f["wr_masks"].shape[1:]))
+                    # Ensure masks have the shape (batch, 1, H, W)
+                    f["wr_masks"][cur_len:new_len] = wr_masks_batch_np.reshape(
+                        -1, 1, *wr_masks_batch_np.shape[1:]
+                    )
+
+                    f["rr_masks"].resize((new_len, *f["rr_masks"].shape[1:]))
+                    f["rr_masks"][cur_len:new_len] = rr_masks_batch_np.reshape(
+                        -1, 1, *rr_masks_batch_np.shape[1:]
+                    )
+
+                    f["gen_masks"].resize((new_len, *f["gen_masks"].shape[1:]))
+                    f["gen_masks"][cur_len:new_len] = gen_masks_batch_np.reshape(
+                        -1, 1, *gen_masks_batch_np.shape[1:]
+                    )
+
+                    # Clear buffers for the next batch
+                    images_batch, class_batch = [], []
+                    confounder_batch, wr_masks_batch = [], []
+                    rr_masks_batch, gen_masks_batch = [], []
+
+            # After finishing the loop, check if there is any remaining data to write
+            if images_batch:
+                if not datasets_initialized:
+                    raise ValueError(
+                        "Dataset was not initialized, but data was yielded from the generator."
+                    )
+
+                cur_len = f["images"].shape[0]
+                new_len = cur_len + len(images_batch)
+                f["images"].resize((new_len, *f["images"].shape[1:]))
+                f["images"][cur_len:new_len] = np.array(images_batch, dtype="float32")
+
+                f["class_label"].resize((new_len,))
+                f["class_label"][cur_len:new_len] = np.array(class_batch, dtype="int64")
+
+                f["confounder_label"].resize((new_len,))
+                f["confounder_label"][cur_len:new_len] = np.array(
+                    confounder_batch, dtype="int64"
+                )
+
+                f["wr_masks"].resize((new_len, *f["wr_masks"].shape[1:]))
+                f["wr_masks"][cur_len:new_len] = np.array(
+                    wr_masks_batch, dtype="float32"
+                ).reshape(-1, 1, *np.array(wr_masks_batch[0]).shape)
+
+                f["rr_masks"].resize((new_len, *f["rr_masks"].shape[1:]))
+                f["rr_masks"][cur_len:new_len] = np.array(
+                    rr_masks_batch, dtype="float32"
+                ).reshape(-1, 1, *np.array(rr_masks_batch[0]).shape)
+
+                f["gen_masks"].resize((new_len, *f["gen_masks"].shape[1:]))
+                f["gen_masks"][cur_len:new_len] = np.array(
+                    gen_masks_batch, dtype="float32"
+                ).reshape(-1, 1, *np.array(gen_masks_batch[0]).shape)
+            else:
+                if not datasets_initialized:
+                    self.logger.warning(
+                        f"No data was yielded from the generator for split: {split_key}. Create an empty dataset."
+                    )
+                    # Create empty datasets if no data was found
+                    f.create_dataset(
+                        "images",
+                        shape=(0, 3, 224, 224),
+                        dtype="float32",
+                    )
+                    f.create_dataset(
+                        "class_label",
+                        shape=(0,),
+                        dtype="int64",
+                    )
+                    f.create_dataset(
+                        "confounder_label",
+                        shape=(0,),
+                        dtype="int64",
+                    )
+                    f.create_dataset(
+                        "wr_masks",
+                        shape=(0, 1, 224, 224),
+                        dtype="float32",
+                    )
+                    f.create_dataset(
+                        "rr_masks",
+                        shape=(0, 1, 224, 224),
+                        dtype="float32",
+                    )
+                    f.create_dataset(
+                        "gen_masks",
+                        shape=(0, 1, 224, 224),
+                        dtype="float32",
+                    )
+
+        self.logger.info(
+            f"Created/Updated h5 file for '{split_key}' split for identifier '{identifier}'."
+        )
+
+    def load_dataloaders_and_loss_weights(
+        self,
+        identifier,
+        augmented_images_dir=None,
+        augmented_gt_label_path=None,
+        generated_masks_dir=None,
+        batch_size_processing_img=1000,
+        batch_size=16,
+        num_workers=1,
+        pin_memory=True,
+    ):
+        """Loads the data from h5, builds the datasets, and returns the dataloaders and loss weights for the training and test sets.
 
         The structure of the data in the dataloader is as follows:
         data[0]: images
@@ -236,13 +469,22 @@ class Dataset:
             Path to the augmented ground truth label csv file. Not needed if augmented images are exchanged with original counterpart instead of added to original dataset.
         generated_masks_dir : str
             Path to the generated masks directory.
+        batch_size : int
+            Batch size for the dataloaders.
+        num_workers : int
+            Number of workers for the dataloaders.
+        pin_memory : bool
+            If to pin memory for the dataloaders.
         """
 
-        def calculate_loss_weights(counter):
+        def calculate_loss_weights(counter, total_samples):
+            if total_samples == 0:
+                return torch.tensor([0.0, 0.0]).float()
             class0 = counter.get(0, 0)  # Get count of class 0, default to 0 if missing
             # class1 = counter.get(1, 0)  # Get count of class 1, default to 0 if missing
-            class0_ratio = class0 / len(dataset)
+            class0_ratio = class0 / total_samples
             class1_ratio = 1 - class0_ratio
+            # Avoid division by zero
             if class0_ratio == 0:
                 return torch.tensor([1.0, 0.0]).float()
             if class1_ratio == 0:
@@ -251,56 +493,123 @@ class Dataset:
             class1_weight = 1 / class1_ratio
             weights = np.asarray([class0_weight, class1_weight])
             weights /= weights.sum()
-            weights = torch.tensor(weights).float()
-            return weights
+            return torch.tensor(weights).float()
 
-        # load data
-        print("Loading data...")
-        data_dict = self.load_data(
-            augmented_images_dir, augmented_gt_label_path, generated_masks_dir
-        )
-
-        # get dataloaders and loss weights
         dataloaders = {}
         loss_weights = {}
-        for split_key in ["train", "val", "test"]:
-            print(f"\nBuilding dataset for {split_key} set...")
-            data = data_dict[split_key]
-            dataset = TensorDataset(
-                torch.from_numpy(data["images"]).float(),
-                torch.from_numpy(data["class_label"]),
-                torch.from_numpy(data["confounder_label"]),
-                torch.from_numpy(data["wr_masks"]).float(),
-                torch.from_numpy(data["rr_masks"]).float(),
-                torch.from_numpy(data["gen_masks"]).float(),
-            )
+        datasets = {}
 
-            classes = [x[1].item() for x in dataset]
-            confounder_dist = [x[2].item() for x in dataset]
+        # For each split, create a lazy-loading dataset.
+        for split_key in ["train", "val", "test"]:
+            # Create HDF5 files if they don't exist.
+            h5_identifier_dir = os.path.join(self.h5_dir, identifier)
+            h5_file = os.path.join(h5_identifier_dir, f"{split_key}_data.h5")
+            if not os.path.exists(h5_file):
+                self.create_h5_file(
+                    identifier,
+                    split_key,
+                    augmented_images_dir,
+                    augmented_gt_label_path,
+                    generated_masks_dir,
+                    batch_size_processing_img,
+                )
+            else:
+                self.logger.info(f"Using existing HDF5 file for {split_key} set.")
+
+            self.logger.info(f"Building dataset for {split_key} set...")
+
+            dataset = H5Dataset(h5_file)
+            datasets[split_key] = dataset
 
             dataloaders[split_key] = DataLoader(
-                dataset, batch_size=batch_size, shuffle=True
+                dataset,
+                batch_size=batch_size,
+                shuffle=(split_key == "train"),
+                num_workers=num_workers,
+                pin_memory=pin_memory,
             )
-            loss_weights[split_key] = calculate_loss_weights(Counter(classes))
 
-            print(f"Number of samples in {split_key} set: {len(dataset)}")
-            print(f"{split_key.upper()} class dist: {Counter(classes)}")
-            print(f"{split_key.upper()} confounder dist: {Counter(confounder_dist)}")
-            print(f"{split_key.upper()} weights: {str(loss_weights[split_key])}\n")
+            # For loss weights, load only the class labels (should be much smaller in size).
+            with h5py.File(h5_file, "r") as f:
+                class_labels = f["class_label"][:]
+            counter = Counter(class_labels)
+            loss_weights[split_key] = calculate_loss_weights(counter, len(class_labels))
 
-        # worst-group test set
-        worst_group_set = torch.utils.data.Subset(
-            dataloaders["test"].dataset,
-            [
-                i
-                for i, x in enumerate(dataloaders["test"].dataset)
-                if (x[1].item() == self.worst_group_class_label)
-                and (x[2].item() == 0)  # non-confounded
-            ],
-        )
-        dataloaders["worst_group_test"] = DataLoader(
-            worst_group_set, batch_size=batch_size, shuffle=True
-        )
-        print(f"Number of samples in worst group test set: {len(worst_group_set)}\n")
+            self.logger.info(f"Number of samples in {split_key} set: {len(dataset)}")
+            self.logger.info(f"{split_key.upper()} class distribution: {counter}")
+            self.logger.info(
+                f"{split_key.upper()} loss weights: {loss_weights[split_key]}"
+            )
+
+        # Build the worst-group test set using indices computed from the test HDF5 file.
+        test_h5_file = os.path.join(h5_identifier_dir, "test_data.h5")
+        with h5py.File(test_h5_file, "r") as f:
+            test_class_labels = f["class_label"][:]
+            test_confounder = f["confounder_label"][:]
+
+        worst_group_indices = np.where(
+            (test_class_labels == self.worst_group_class_label) & (test_confounder == 0)
+        )[0].tolist()
+
+        if len(worst_group_indices) > 0:
+            worst_group_set = torch.utils.data.Subset(
+                datasets["test"], worst_group_indices
+            )
+            dataloaders["worst_group_test"] = DataLoader(
+                worst_group_set,
+                batch_size=batch_size,
+                shuffle=True,
+                num_workers=num_workers,
+                pin_memory=pin_memory,
+            )
+            self.logger.info(
+                f"Number of samples in worst-group test set: {len(worst_group_indices)}"
+            )
+        else:
+            dataloaders["worst_group_test"] = None
+            self.logger.warning("Worst-group test set is empty.")
 
         return dataloaders, loss_weights
+
+
+# Custom Dataset that reads from an HDF5 file lazily.
+class H5Dataset(torch.utils.data.Dataset):
+    def __init__(self, h5_path):
+        self.h5_path = h5_path
+        self.data = None  # This will be lazily initialized per worker
+        # Get dataset length by opening the file briefly.
+        with h5py.File(h5_path, "r") as f:
+            self.length = f["images"].shape[0]
+
+    def _init_file(self):
+        # In multi-worker setups, each worker should open its own file handle.
+        if self.data is None:
+            self.data = h5py.File(self.h5_path, "r")
+
+    def __getitem__(self, index):
+        self._init_file()
+
+        # Retrieve the sample from the HDF5 file.
+        image = self.data["images"][index]
+        class_label = self.data["class_label"][index]
+        confounder_label = self.data["confounder_label"][index]
+        wr_mask = self.data["wr_masks"][index]
+        rr_mask = self.data["rr_masks"][index]
+        gen_mask = self.data["gen_masks"][index]
+
+        # Convert arrays to PyTorch tensors.
+        image = torch.tensor(image, dtype=torch.float32)
+        class_label = torch.tensor(class_label, dtype=torch.long)
+        confounder_label = torch.tensor(confounder_label, dtype=torch.long)
+        wr_mask = torch.tensor(wr_mask, dtype=torch.float32)
+        rr_mask = torch.tensor(rr_mask, dtype=torch.float32)
+        gen_mask = torch.tensor(gen_mask, dtype=torch.float32)
+
+        return image, class_label, confounder_label, wr_mask, rr_mask, gen_mask
+
+    def __len__(self):
+        return self.length
+
+    def __del__(self):
+        if self.data is not None:
+            self.data.close()

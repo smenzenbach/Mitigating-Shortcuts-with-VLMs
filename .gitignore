@@ -23,3 +23,5 @@ __pycache__/
 
 # no models
 *.pth
+# no h5 files
+*.h5
