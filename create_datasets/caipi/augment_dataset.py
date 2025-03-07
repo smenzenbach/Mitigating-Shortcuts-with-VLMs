@@ -1,7 +1,7 @@
 import numpy as np
 import yaml
 import pandas as pd
-import tqdm
+from tqdm import tqdm
 import os
 from PIL import Image
 import csv
@@ -37,7 +37,7 @@ def generate_counterexample(images, masks):
 
 def counterexamples(dataset_name, augmented_dir):
     with open(
-        f"/data/datasets.yaml", "r"
+        f"data/datasets.yaml", "r"
     ) as file:
         dataset_yaml = yaml.safe_load(file)
     # set raw and gt paths
@@ -62,7 +62,8 @@ def counterexamples(dataset_name, augmented_dir):
         wr_mask_path = os.path.join(wr_masks_dir, row["filename"])
 
         # load images and masks
-        image = np.array(Image.open(raw_img_path).convert("RGB"))
+        image = Image.open(raw_img_path).convert("RGB")
+        image = np.array(image.resize((299, 299), resample=Image.LANCZOS))
         if os.path.exists(wr_mask_path):
             wr_mask = np.array(Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
         else:
@@ -88,8 +89,8 @@ def counterexamples(dataset_name, augmented_dir):
 if __name__ == "__main__":
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Create CAIPI counterexamples for a dataset")
-    parser.add_argument("dataset_name", type=str, help="Name of the dataset config")
-    parser.add_argument("augmented_dir", type=str, help="Path to the augmented directory")
+    parser.add_argument("--dataset_name", type=str, help="Name of the dataset config")
+    parser.add_argument("--augmented_dir", type=str, help="Path to the augmented directory")
 
     args = parser.parse_args()
 
