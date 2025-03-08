@@ -11,5 +11,17 @@ __pycache__/
 **/training_and_eval/eval_output*
 **/training_and_eval/logs*
 
+# datasets
+**/datasets/*
+
+# augmented datasets
+**/augmented/*
+
+# masks
+**/rr_masks/*
+**/wr_masks/*
+
+# no models
+*.pth
 # no h5 files
 *.h5

@@ -1,4 +1,4 @@
-import tqdm
+from tqdm import tqdm
 import json
 import torch
 import numpy as np
@@ -14,14 +14,12 @@ def remove_object(image, mask):
     Remove an object from an image using a segmentation mask.
 
     Args:
-        image (PIL.Image): Input image.
+        image (np.array): Input image.
         mask (np.array): Binary mask with values 0 or 255.
 
     Returns:
         PIL.Image: Modified image with the object removed.
     """
-    # Convert PIL image to NumPy array
-    image_np = np.array(image)
 
     # Find bounding box coordinates of the mask (where mask is 255)
     y_indices, x_indices = np.where(mask == 255)
@@ -37,13 +35,10 @@ def remove_object(image, mask):
     fill_color = np.array([124, 116, 104], dtype=np.uint8)
 
     # Replace pixels inside bounding box with fill color
-    image_np[ymin:ymax+1, xmin:xmax+1] = fill_color
+    image[ymin:ymax+1, xmin:xmax+1] = fill_color
 
     # Convert back to PIL Image
-    return Image.fromarray(image_np)
-
-import numpy as np
-from PIL import Image
+    return Image.fromarray(image)
 
 def add_object(image, reference_mask, reference_image):
     """
@@ -57,21 +52,23 @@ def add_object(image, reference_mask, reference_image):
     Returns:
         PIL.Image: Image with the object added.
     """
-    # Convert images to NumPy arrays
-    image_np = np.array(image)
-    reference_image_np = np.array(reference_image)
 
     # Ensure the reference mask is binary (0 or 1)
     reference_mask = (reference_mask > 0).astype(np.uint8)
+    reference_mask = np.expand_dims(reference_mask, axis=-1)
+    reference_mask = np.repeat(reference_mask, 3, axis=-1)
 
-    # Expand the mask to 3 channels for RGB images
-    mask_3ch = np.stack([reference_mask] * 3, axis=-1)
+    plt.imsave('image.jpg', image)
+    plt.imsave('reference_image.jpg', reference_image)
+    plt.imsave('reference_mask.jpg', reference_mask)
 
     # Copy object from reference image where mask == 1
-    image_np = np.where(mask_3ch == 1, reference_image_np, image_np)
+    image = np.where(reference_mask > 0, reference_image, image)
+
+    plt.imsave('image_with_object.jpg', image)
 
     # Convert back to PIL Image
-    return Image.fromarray(image_np)
+    return Image.fromarray(image)
 
 
 def get_groups(metadata):
@@ -119,8 +116,6 @@ def get_groups(metadata):
                 groups['neither'].append(row['filename'])
 
     return groups
-
-# TODO add_object function, what parameters?
 
 def compute_augmentations(groups):
     """

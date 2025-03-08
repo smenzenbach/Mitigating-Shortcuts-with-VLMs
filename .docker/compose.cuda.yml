@@ -2,6 +2,8 @@ services:
   shortcutvlm:
     deploy:
       resources:
+        limits:
+            cpus: "2"
         reservations:
           devices:
             - driver: nvidia

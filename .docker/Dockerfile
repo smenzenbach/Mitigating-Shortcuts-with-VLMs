@@ -17,8 +17,6 @@ WORKDIR /workspaces/$PROJECT_NAME
 
 COPY requirements.txt .
 
-RUN ln -s /workspaces/$PROJECT_NAME/aimw /usr/bin
-
 RUN \
   python -m pip install --upgrade pip && \
   pip install "torch==2.3.0" -r requirements.txt  
