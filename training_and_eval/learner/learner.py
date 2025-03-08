@@ -60,8 +60,10 @@ class Learner:
         if logger is not None:
             self.logger = logger
         else:
-            self.logger = MyLogger(f"{logger_dir}/{self.modelname}.log")
-        self.train_logger = MyLogger(f"{logger_dir}/{self.modelname}-epoch_stats.log")
+            self.logger = MyLogger(f"{logger_dir}/{self.modelname}.log").logger
+        self.train_logger = MyLogger(
+            f"{logger_dir}/{self.modelname}-epoch_stats.log"
+        ).logger
         self.writer = SummaryWriter(
             log_dir=f"{repo_dir}/training_and_eval/runs/"
             + self.modelname
@@ -85,11 +87,14 @@ class Learner:
 
     def score(self, dataloader, criterion, verbose=False):
         """Returns the acc and loss on the specified dataloader."""
+        self.logger.info(f"Eval model on given set...")
         size = len(dataloader.dataset)
+        if size == 0:
+            return 0, 0
         self.model.eval()
         test_loss, correct = 0, 0
         with torch.no_grad():
-            for data in dataloader:
+            for data in tqdm(dataloader):
                 X, y = data[0].to(self.device), data[1].to(self.device)
                 output = self.model(X)
                 # output = F.softmax(self.model(X), dim=1)
@@ -140,7 +145,7 @@ class Learner:
         if "epochs" in checkpoint:
             epochs_ = checkpoint["epochs"]
         self.logger.info(
-            f"Model {self.modelname} loaded! Was trained on {checkpoint['loss']} for {epochs_} epochs!"
+            f"Model {self.modelname} loaded! Was trained on {checkpoint['loss']} for {epochs_} epochs!\n"
         )
         return epochs_
 
@@ -197,7 +202,7 @@ class Learner:
             train_loss, correct = 0, 0
             start_time = time.time()
 
-            for batch, data in enumerate(dataloader):
+            for batch, data in enumerate(tqdm(dataloader)):
                 self.optimizer.zero_grad()
                 # functionality to disable xil_loss for n number
                 # of epochs beginning from first epoch
@@ -279,6 +284,7 @@ class Learner:
         y_val_list = []
         self.model.eval()
         test_loss, correct = 0, 0
+        # TODO: use score function? but doesnt create lists for confusion matrix
         with torch.no_grad():
             for data in dataloader:
                 X, y = data[0].to(self.device), data[1].to(self.device)

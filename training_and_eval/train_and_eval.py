@@ -1,9 +1,8 @@
 import argparse
 import datetime
 
-from loguru import Logger
 from setup_data import Dataset
-from learner.models import VGG16_pretrained
+from learner.models import VGG16_pretrained, resnet50_pretrained
 from utils import seed_all, MyLogger
 import torch.nn as nn
 import logging
@@ -17,8 +16,9 @@ from learner.learner import Learner
 # python train_and_eval.py --dataset ISIC19 --augmented_images_dir /workspace/home/pipeline_outputs/ISIC19/pipeline_test/inpainting -d 2 --id pipeline -l
 # python train_and_eval.py --dataset CelebA -d 1 --id vanilla_test
 # python train_and_eval.py --dataset CelebA -d 3 --id vanilla -l
-# python train_and_eval.py --dataset CelebA --augmented_images_dir /workspace/home/pipeline_outputs/CelebA/lama_sdxl/inpainting -d 1 --id lama_sdxl -l
-# python train_and_eval.py --dataset coco -d 0 --id vanilla
+# python train_and_eval.py --dataset CelebA --augmented_images_dir /workspace/home/pipeline_outputs/CelebA/lama_sdxl/inpainting -d 2 --id lama_sdxl -l --model vgg16
+# python train_and_eval.py --dataset coco -d 3 --id vanilla --model resnet50 --batch_size 64
+# python train_and_eval.py --dataset coco -d 3 --id lama_sdxl --model resnet50 --batch_size 64 --augmented_images_dir /workspace/home/pipeline_outputs/coco/racket_person/inpainting
 
 parser = argparse.ArgumentParser(
     description="SHORTCUT MITIGATION THROUGH INPAINTING EVAL"
@@ -51,18 +51,23 @@ parser.add_argument(
     help="Which GPU to use? Please give the id of the GPU",
 )
 parser.add_argument("-l", "--load", action="store_true", help="If to load model")
+
 parser.add_argument(
+    "-m",
     "--model",
-    default="vgg16",
+    default="resnet50",
     choices=["vgg16", "resnet50"],
     help="Which model should be used?",
 )  # add more models
+
 parser.add_argument(
     "--id",
     default=None,
     help="ID to identify trained model. If None then timestamp is used.",
 )
+
 parser.add_argument("-bs", "--batch_size", default=16, type=int, help="Batch size")
+
 args = parser.parse_args()
 
 DEVICE = f"cuda:{args.device}"
@@ -78,10 +83,9 @@ VERBOSE_AFTER_N_EPOCHS = 1
 # get dir of repo (parent dir)
 repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# set up logger
+# setup general logger over all runs
 logger_dir = f"{repo_dir}/training_and_eval/logs"
-os.makedirs(logger_dir, exist_ok=True)
-logger = MyLogger(f"{logger_dir}/shortcut_mitigation_training.log")
+general_logger = MyLogger(f"{logger_dir}/shortcut_mitigation_training.log").logger
 
 
 # get identifier for run
@@ -90,8 +94,16 @@ if args.id is not None:
 else:
     identifier = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
+# set up identifier specific logger
+os.makedirs(logger_dir, exist_ok=True)
+logger = MyLogger(f"{logger_dir}/{args.dataset}-{identifier}.log").logger
+
+general_logger.info(f"Load data for {identifier}")
+logger.info(f"Loading data....")
+
+
 # Load data
-dataset = Dataset(dataset_name=args.dataset, model_name=args.model)
+dataset = Dataset(dataset_name=args.dataset, model_name=args.model, logger=logger)
 
 dataloaders, loss_weights = dataset.load_dataloaders_and_loss_weights(
     identifier=identifier,
@@ -99,6 +111,9 @@ dataloaders, loss_weights = dataset.load_dataloaders_and_loss_weights(
     generated_masks_dir=args.generated_masks_dir,
     batch_size=BATCH_SIZE,
 )
+
+general_logger.info(f"Data loaded for {identifier}. \n")
+logger.info(f"Data loaded.\n")
 
 train_dataloader, val_dataloader, test_dataloader, wg_test_dataloader = (
     dataloaders["train"],
@@ -108,12 +123,30 @@ train_dataloader, val_dataloader, test_dataloader, wg_test_dataloader = (
 )
 
 ########### Initalize model, loss and optimizer
+if args.model == "vgg16":
+    model = VGG16_pretrained(freeze_features=False).to(DEVICE)
+    optimizer = torch.optim.SGD(model.parameters(), lr=LR, momentum=0.9)
+    opt_str = "SGD(momentum=0.9)"
+elif args.model == "resnet50":
+    model = resnet50_pretrained(freeze_features=False).to(DEVICE)
+    optimizer = torch.optim.Adam(model.parameters(), lr=LR)
+    opt_str = "Adam"
+
 # Logging
+# training info for general logger
+general_logger.info(
+    f"--------RPEXP Train {args.model}, base_criterion=CEL, dataset={args.dataset}, identifier={identifier}--------"
+)
+general_logger.info(
+    f"-HYPERPARAMS epochs= {EPOCHS}, batch_size={BATCH_SIZE}, lr={LR}, optim={opt_str}, save_last={SAVE_LAST}, seeds={SEED}, scheduler={SCHEDULER}, shuffle={TRAIN_SHUFFLE}\n"
+)
+
+# training info for specific logger
 logger.info(
-    f"\n\n--------RPEXP Train {args.model}, base_criterion=CEL, dataset={args.dataset}, identifier={identifier}--------"
+    f"--------RPEXP Train {args.model}, base_criterion=CEL, dataset={args.dataset}, identifier={identifier}--------"
 )
 logger.info(
-    f"-HYPERPARAMS epochs= {EPOCHS}, batch_size={BATCH_SIZE}, lr={LR}, optim=SGD(momentum=0.9), save_last={SAVE_LAST}, seeds={SEED}, scheduler={SCHEDULER}, shuffle={TRAIN_SHUFFLE}"
+    f"-HYPERPARAMS epochs= {EPOCHS}, batch_size={BATCH_SIZE}, lr={LR}, optim={opt_str}, save_last={SAVE_LAST}, seeds={SEED}, scheduler={SCHEDULER}, shuffle={TRAIN_SHUFFLE}\n"
 )
 
 # Set seed
@@ -122,9 +155,6 @@ seed_all(SEED)
 # Load model
 MODELNAME = f"{dataset.dataset_name}-{identifier}"
 
-if args.model == "vgg16":
-    model = VGG16_pretrained(freeze_features=False).to(DEVICE)
-    optimizer = torch.optim.SGD(model.parameters(), lr=LR, momentum=0.9)
 
 # loss
 base_criterion = nn.CrossEntropyLoss(weight=loss_weights["train"].to(DEVICE))
@@ -172,4 +202,4 @@ logger.info("WR on test set DONE.")
 
 # RR
 learner.get_rr_metric(test_dataloader)
-logger.info("RR on test set DONE.")
+logger.info("RR on test set DONE.\n")

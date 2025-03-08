@@ -18,7 +18,7 @@ repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 class Dataset:
-    def __init__(self, dataset_name, model_name="vgg16"):
+    def __init__(self, dataset_name, model_name="vgg16", logger=None):
         # get dataset name and yaml for raw and gt paths
         self.dataset_name = dataset_name
         with open(
@@ -42,11 +42,14 @@ class Dataset:
         self.h5_dir = f"{repo_dir}/training_and_eval/h5_files/{self.dataset_name}"
         os.makedirs(self.h5_dir, exist_ok=True)
         # set logger
-        self.logger = MyLogger(
-            f"{repo_dir}/training_and_eval/logs/data_setup.log"
-        ).logger
+        if logger is not None:
+            self.logger = logger
+        else:
+            logger_dir = f"{repo_dir}/training_and_eval/logs"
+            os.makedirs(logger_dir, exist_ok=True)
+            logger = MyLogger(f"{logger_dir}/setup_data_{self.dataset_name}.log").logger
         self.logger.info(
-            f"Dataset {self.dataset_name} initialized for model {self.model_name}."
+            f"Dataset {self.dataset_name} initialized for model {self.model_name}.\n"
         )
 
     def load_image(self, img_path, image_size=None):
@@ -108,10 +111,10 @@ class Dataset:
         # get list of inpainted files (to determine when to use raw or inpainted image) and list of mask files that are generated (e.g. through our pipeline)
         if augmented_images_dir is not None:
             list_augmented_files = create_file_names_list(augmented_images_dir)
-            print(f"Found {len(list_augmented_files)} augmented images.")
+            self.logger.info(f"Found {len(list_augmented_files)} augmented images.")
         if generated_masks_dir is not None:
             list_mask_files = create_file_names_list(generated_masks_dir)
-            print(f"Found {len(list_mask_files)} generated masks.")
+            self.logger.info(f"Found {len(list_mask_files)} generated masks.")
 
         # merge csv files self.metadata and aug_metadata
         if augmented_gt_label_path is not None:
@@ -448,7 +451,7 @@ class Dataset:
         generated_masks_dir=None,
         batch_size_processing_img=1000,
         batch_size=16,
-        num_workers=1,
+        num_workers=4,
         pin_memory=True,
     ):
         """Loads the data from h5, builds the datasets, and returns the dataloaders and loss weights for the training and test sets.
@@ -538,7 +541,7 @@ class Dataset:
             self.logger.info(f"Number of samples in {split_key} set: {len(dataset)}")
             self.logger.info(f"{split_key.upper()} class distribution: {counter}")
             self.logger.info(
-                f"{split_key.upper()} loss weights: {loss_weights[split_key]}"
+                f"{split_key.upper()} loss weights: {loss_weights[split_key]}\n"
             )
 
         # Build the worst-group test set using indices computed from the test HDF5 file.
@@ -561,9 +564,11 @@ class Dataset:
                 shuffle=True,
                 num_workers=num_workers,
                 pin_memory=pin_memory,
+                persistent_workers=True,
+                prefetch_factor=3,
             )
             self.logger.info(
-                f"Number of samples in worst-group test set: {len(worst_group_indices)}"
+                f"Number of samples in worst-group test set: {len(worst_group_indices)}\n"
             )
         else:
             dataloaders["worst_group_test"] = None
