@@ -13,7 +13,8 @@ h5py
 captum
 toml
 
-
+loguru
+tensorboard
 
 transformers
 
