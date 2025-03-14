@@ -13,4 +13,4 @@ services:
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - ..:/workspaces/${COMPOSE_PROJ_NAME}
-      - /storage-01/datasets:/workspaces/datasets
+      - /storage-01/datasets:/workspaces/${COMPOSE_PROJ_NAME}/datasets
