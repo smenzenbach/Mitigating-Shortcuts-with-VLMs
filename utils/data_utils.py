@@ -121,6 +121,9 @@ def create_file_names_list_from_csv(
     return file_list
 
 
+# todo: write function that allows to filter with a csv but takes images from a directory
+
+
 def filter_list_by_csv(
     file_list, csv_file_path, filter_func, header=True, ignore_copy=False, num_imgs=None
 ):
@@ -388,3 +391,9 @@ def read_h5(h5_file_path):
 
 def get_config_id_from_path(config_path):
     return config_path.split("/")[-1].split("_", 1)[1].split(".")[0]
+
+
+def chunks(lst, n):
+    """Yield successive chunks of size n from lst."""
+    for i in range(0, len(lst), n):
+        yield lst[i : i + n]

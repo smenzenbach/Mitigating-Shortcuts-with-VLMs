@@ -5,17 +5,17 @@ ISIC19:
   raw_dir: /workspace/datasets/ISIC19/raw
   worst_group_class_label: 0 # benign without patch (but I thing malignant was worse...?)
 
-Pascal_VOC07:
-  gt_label_path: /workspace/home/data/Pascal_VOC07/gt_label.csv
-  wr_masks_dir: /workspace/home/data/Pascal_VOC07/gt_seg
-  rr_masks_dir: None
-  raw_dir: /workspace/home/data/Pascal_VOC07/raw
-
+ISIC19_200:
+  gt_label_path: /workspace/home/Mitigating-Shortcuts-with-VLMs/data/ISIC19_200/gt_label.csv
+  wr_masks_dir: /workspace/home/Mitigating-Shortcuts-with-VLMs/data/ISIC19_200/wr_masks
+  rr_masks_dir: /workspace/home/Mitigating-Shortcuts-with-VLMs/data/ISIC19_200/rr_masks
+  raw_dir: /workspace/home/Mitigating-Shortcuts-with-VLMs/data/ISIC19_200/raw
+  worst_group_class_label: 0 # benign without patch (but I thing malignant was worse...?)
 
 CelebA:
   gt_label_path: /workspace/home/data/CelebA/gt_label.csv
-  wr_masks_dir: None
-  rr_masks_dir: None
+  wr_masks_dir: /workspace/home/data/CelebA/wr_masks
+  rr_masks_dir: /workspace/home/data/CelebA/rr_masks
   raw_dir: /workspace/home/data/CelebA/celebA_v1.0/img_align_celeba
   worst_group_class_label: 1 # male with blond hair
 
@@ -23,5 +23,5 @@ coco:
   gt_label_path: /workspace/home/data/coco/gt_label.csv
   wr_masks_dir: /workspace/home/data/coco/wr_masks
   rr_masks_dir: /workspace/home/data/coco/rr_masks
-  raw_dir: /workspace/datasets/coco/raw
+  raw_dir: /workspace/datasets/coco/images/val2017 # sub dir handling too slow
   worst_group_class_label: 1 # tennis racket without person

@@ -36,6 +36,6 @@ def dilate_mask(
     # ensure its binary
     dilated_mask = np.where(dilated_mask < 128, 0, 255)
     if is_pil:
-        return Image.fromarray(dilated_mask).convert("L")
+        return Image.fromarray(dilated_mask.astype(np.uint8)).convert("L")
     else:
         return dilated_mask
