@@ -15,7 +15,7 @@ with open(csv_path, "w", newline="") as csvfile:
     writer.writeheader()
 
     # coco dir
-    coco_dir = "/workspace/datasets/coco"
+    coco_dir = "datasets/coco"
 
     for split_key in ["train", "val"]:  # no annotations for test: val = test
         dataType = split_key + "2017"
@@ -58,6 +58,10 @@ with open(csv_path, "w", newline="") as csvfile:
                 1 if imgId in imgIds_person else 0
             )  # person = 1, no person = 0
             split = 0 if split_key == "train" else 2  # no validation set, so val = test
+            # move all images with only racket to test
+            if class_label == 1 and confounder_label == 0:
+                split = 2
+
 
             writer.writerow(
                 {
