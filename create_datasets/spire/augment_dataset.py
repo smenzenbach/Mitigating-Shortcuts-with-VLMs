@@ -10,7 +10,7 @@ import csv
 import random
 
 def augment_dataset(dataset_name, augmented_dir, no_class_change):
-    with open(f"data/datasets.yaml", "r") as file:
+    with open(f"data/datasets_info.yaml", "r") as file:
         dataset_yaml = yaml.safe_load(file)
     # set raw and gt paths
     raw_dir = dataset_yaml[dataset_name]["raw_dir"]
@@ -22,7 +22,7 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
 
     groups = utils.get_groups(metadata) # already only contains training examples
     if no_class_change:
-        # only add modify spurious objects (but always)
+        # only modify spurious objects (but do that always)
         sampling_probs = {'B2M': 1, 'B2S': 0, 'M2N': 0, 'S2N': 1, 'N2M': 0, 'N2S': 1, 'M2B': 1, 'S2B': 0}
     else:
         sampling_probs = utils.compute_augmentations(groups)
@@ -45,11 +45,19 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         image = Image.open(raw_img_path).convert("RGB")
         image = np.array(image.resize((299, 299), resample=Image.LANCZOS))
         if os.path.exists(wr_mask_path):
-            wr_mask = np.array(Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
+            if not dataset_name == "ISIC19":
+                wr_mask = Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255)
+                wr_mask = np.array(wr_mask.resize((299, 299), resample=Image.LANCZOS))
+            else:
+                wr_mask = np.array(Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
         else:
             wr_mask = None
         if os.path.exists(rr_mask_path):
-            rr_mask = np.array(Image.open(rr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
+            if not dataset_name == "ISIC19":
+                rr_mask = Image.open(rr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255)
+                rr_mask = np.array(rr_mask.resize((299, 299), resample=Image.LANCZOS))
+            else:
+                rr_mask = np.array(Image.open(rr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
         else:
             rr_mask = None
 
@@ -58,13 +66,19 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         aug_confounder_labels = []
         # create one augmented version with rr and wr removed if it exists
         if rm_conf:
-            aug_imgs.append(utils.remove_object(image, wr_mask))
-            aug_class_labels.append(1)
-            aug_confounder_labels.append(0)
+            if wr_mask is None:
+                print(f"Warning: No wr mask found for {file_name} (group: both)")
+            else:
+                aug_imgs.append(utils.remove_object(image, wr_mask))
+                aug_class_labels.append(1)
+                aug_confounder_labels.append(0)
         if rm_class:
-            aug_imgs.append(utils.remove_object(image, rr_mask))
-            aug_class_labels.append(0)
-            aug_confounder_labels.append(1)
+            if rr_mask is None:
+                print(f"Warning: No rr mask found for {file_name} (group: both)")
+            else:
+                aug_imgs.append(utils.remove_object(image, rr_mask))
+                aug_class_labels.append(0)
+                aug_confounder_labels.append(1)
 
         # save the new images
         for i, aug_img in enumerate(aug_imgs):
@@ -88,11 +102,19 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         image = np.array(image.resize((299, 299), resample=Image.LANCZOS))
 
         if os.path.exists(wr_mask_path):
-            wr_mask = np.array(Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
+            if not dataset_name == "ISIC19":
+                wr_mask = Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255)
+                wr_mask = np.array(wr_mask.resize((299, 299), resample=Image.LANCZOS))
+            else:
+                wr_mask = np.array(Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
         else:
             wr_mask = None
         if os.path.exists(rr_mask_path):
-            rr_mask = np.array(Image.open(rr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
+            if not dataset_name == "ISIC19":
+                rr_mask = Image.open(rr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255)
+                rr_mask = np.array(rr_mask.resize((299, 299), resample=Image.LANCZOS))
+            else:
+                rr_mask = np.array(Image.open(rr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
         else:
             rr_mask = None
 
@@ -106,14 +128,21 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
             # load reference image and mask
             ref_image = Image.open(os.path.join(raw_dir, reference_image_name)).convert("RGB")
             ref_image = np.array(ref_image.resize((299, 299), resample=Image.LANCZOS))
-            ref_mask = np.array(Image.open(os.path.join(wr_masks_dir, reference_image_name)).convert("L").point(lambda x: 0 if x < 128 else 255)) 
+            if not dataset_name == "ISIC19":
+                ref_mask = Image.open(os.path.join(wr_masks_dir, reference_image_name)).convert("L").point(lambda x: 0 if x < 128 else 255)
+                ref_mask = np.array(ref_mask.resize((299, 299), resample=Image.LANCZOS))
+            else:
+                ref_mask = np.array(Image.open(os.path.join(wr_masks_dir, reference_image_name)).convert("L").point(lambda x: 0 if x < 128 else 255)) 
             aug_imgs.append(utils.add_object(image, ref_mask, ref_image))
             aug_class_labels.append(1)
             aug_confounder_labels.append(1)
         if rm_class:
-            aug_imgs.append(utils.remove_object(image, rr_mask))
-            aug_class_labels.append(0)
-            aug_confounder_labels.append(0)
+            if rr_mask is None:
+                print(f"Warning: No wr mask found for {file_name} (group: just class)")
+            else:
+                aug_imgs.append(utils.remove_object(image, rr_mask))
+                aug_class_labels.append(0)
+                aug_confounder_labels.append(0)
 
         # save the new images
         for i, aug_img in enumerate(aug_imgs):
@@ -136,30 +165,44 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         image = Image.open(raw_img_path).convert("RGB")
         image = np.array(image.resize((299, 299), resample=Image.LANCZOS))
         if os.path.exists(wr_mask_path):
-            wr_mask = np.array(Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
+            if not dataset_name == "ISIC19":
+                wr_mask = Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255)
+                wr_mask = np.array(wr_mask.resize((299, 299), resample=Image.LANCZOS))
+            else:
+                wr_mask = np.array(Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
         else:
             wr_mask = None
         if os.path.exists(rr_mask_path):
-            rr_mask = np.array(Image.open(rr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
+            if not dataset_name == "ISIC19":
+                rr_mask = Image.open(rr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255)
+                rr_mask = np.array(rr_mask.resize((299, 299), resample=Image.LANCZOS))
+            else:
+                rr_mask = np.array(Image.open(rr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
         else:
             rr_mask = None
 
-        print(file_name)
         aug_imgs = []
         aug_class_labels = []
         aug_confounder_labels = []
         # create one augmented version with rr and wr removed if it exists
         if rm_conf:
-            aug_imgs.append(utils.remove_object(image, wr_mask))
-            aug_class_labels.append(0)
-            aug_confounder_labels.append(0)
+            if wr_mask is None:
+                print(f"Warning: No wr mask found for {file_name} (group: just confounded)")
+            else:
+                aug_imgs.append(utils.remove_object(image, wr_mask))
+                aug_class_labels.append(0)
+                aug_confounder_labels.append(0)
         if add_class:
             # select a random image wich contains the class
             reference_image_name = random.choice(groups['class'], 1)
             # load reference image and mask     
             ref_image = Image.open(os.path.join(raw_dir, reference_image_name)).convert("RGB")
             ref_image = np.array(ref_image.resize((299, 299), resample=Image.LANCZOS))
-            ref_mask = np.array(Image.open(os.path.join(rr_masks_dir, reference_image_name)).convert("L").point(lambda x: 0 if x < 128 else 255)) 
+            if not dataset_name == "ISIC 19":
+                ref_mask = Image.open(os.path.join(rr_masks_dir, reference_image_name)).convert("L").point(lambda x: 0 if x < 128 else 255)
+                ref_mask = np.array(ref_mask.resize((299, 299), resample=Image.LANCZOS))
+            else:
+                ref_mask = np.array(Image.open(os.path.join(rr_masks_dir, reference_image_name)).convert("L").point(lambda x: 0 if x < 128 else 255)) 
             aug_imgs.append(utils.add_object(image, ref_mask, ref_image))
             aug_class_labels.append(1)
             aug_confounder_labels.append(1)
@@ -185,11 +228,19 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         image = Image.open(raw_img_path).convert("RGB")
         image = np.array(image.resize((299, 299), resample=Image.LANCZOS))
         if os.path.exists(wr_mask_path):
-            wr_mask = np.array(Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
+            if not dataset_name == "ISIC19":
+                wr_mask = Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255)
+                wr_mask = np.array(wr_mask.resize((299, 299), resample=Image.LANCZOS))
+            else:
+                wr_mask = np.array(Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
         else:
             wr_mask = None
         if os.path.exists(rr_mask_path):
-            rr_mask = np.array(Image.open(rr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
+            if not dataset_name == "ISIC19":
+                rr_mask = Image.open(rr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255)
+                rr_mask = np.array(rr_mask.resize((299, 299), resample=Image.LANCZOS))
+            else:
+                rr_mask = np.array(Image.open(rr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
         else:
             rr_mask = None
 
@@ -203,7 +254,11 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
             # load reference image and mask
             ref_image = Image.open(os.path.join(raw_dir, reference_image_name)).convert("RGB")
             ref_image = np.array(ref_image.resize((299, 299), resample=Image.LANCZOS))
-            ref_mask = np.array(Image.open(os.path.join(wr_masks_dir, reference_image_name)).convert("L").point(lambda x: 0 if x < 128 else 255)) 
+            if not dataset_name == "ISIC19":
+                ref_mask = Image.open(os.path.join(wr_masks_dir, reference_image_name)).convert("L").point(lambda x: 0 if x < 128 else 255)
+                ref_mask = np.array(ref_mask.resize((299, 299), resample=Image.LANCZOS))
+            else:
+                ref_mask = np.array(Image.open(os.path.join(wr_masks_dir, reference_image_name)).convert("L").point(lambda x: 0 if x < 128 else 255)) 
             aug_imgs.append(utils.add_object(image, ref_mask, ref_image))
             aug_class_labels.append(0)
             aug_confounder_labels.append(1)
@@ -213,7 +268,11 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
             # load reference image and mask
             ref_image = Image.open(os.path.join(raw_dir, reference_image_name)).convert("RGB")
             ref_image = np.array(ref_image.resize((299, 299), resample=Image.LANCZOS))
-            ref_mask = np.array(Image.open(os.path.join(rr_masks_dir, reference_image_name)).convert("L").point(lambda x: 0 if x < 128 else 255)) 
+            if not dataset_name == "ISIC19":
+                ref_mask = Image.open(os.path.join(rr_masks_dir, reference_image_name)).convert("L").point(lambda x: 0 if x < 128 else 255)
+                ref_mask = np.array(ref_mask.resize((299, 299), resample=Image.LANCZOS))
+            else:
+                ref_mask = np.array(Image.open(os.path.join(rr_masks_dir, reference_image_name)).convert("L").point(lambda x: 0 if x < 128 else 255)) 
             aug_imgs.append(utils.add_object(image, ref_mask, ref_image))
             aug_class_labels.append(1)
             aug_confounder_labels.append(0)
@@ -236,9 +295,9 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
 if __name__ == "__main__":
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Create an augmented version of the dataset for Spire")
-    parser.add_argument("--dataset_name", type=str, help="Name of the dataset config", default="ISIC19")
-    parser.add_argument("--augmented_dir", type=str, help="Path to the augmented directory", default="data/ISIC19/augmented/spire")
-    parser.add_argument("-no_class_change", action="store_true", help="Whether the class attribute can be modified by Spire", default=True)
+    parser.add_argument("--dataset_name", type=str, help="Name of the dataset config", default="coco")
+    parser.add_argument("--augmented_dir", type=str, help="Path to the augmented directory", default="data/coco/augmented/spire")
+    parser.add_argument("-no_class_change", action="store_true", help="Whether the class attribute can be modified by Spire")
 
     args = parser.parse_args()
 

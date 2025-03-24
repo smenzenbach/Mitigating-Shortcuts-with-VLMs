@@ -25,7 +25,7 @@ def remove_object(image, mask):
     y_indices, x_indices = np.where(mask == 255)
 
     if len(y_indices) == 0 or len(x_indices) == 0:
-        return image  # If no object is found, return original image
+        return Image.fromarray(image)  # If no object is found, return original image
 
     # Get bounding box coordinates
     xmin, xmax = x_indices.min(), x_indices.max()
@@ -58,14 +58,8 @@ def add_object(image, reference_mask, reference_image):
     reference_mask = np.expand_dims(reference_mask, axis=-1)
     reference_mask = np.repeat(reference_mask, 3, axis=-1)
 
-    plt.imsave('image.jpg', image)
-    plt.imsave('reference_image.jpg', reference_image)
-    plt.imsave('reference_mask.jpg', reference_mask)
-
     # Copy object from reference image where mask == 1
     image = np.where(reference_mask > 0, reference_image, image)
-
-    plt.imsave('image_with_object.jpg', image)
 
     # Convert back to PIL Image
     return Image.fromarray(image)
@@ -195,10 +189,10 @@ def compute_augmentations(groups):
         return cost
 
     
-    B = groups['both']
-    M = groups['just_class']
-    S = groups['just_confounded']
-    N = groups['neither']
+    B = len(groups['both'])
+    M = len(groups['just_class'])
+    S = len(groups['just_confounded'])
+    N = len(groups['neither'])
 
     # for compatibility with the SPIRE Code:
     sizes = {'B': B, 'M': M, 'S': S, 'N': N}
@@ -264,7 +258,7 @@ def compute_augmentations(groups):
     probs = {}
     for key in augs:
         source, dest = unpack_key(key)
-        v = augs[key] / max(sizes[source], 1e-8)
-        probs[key] = float(v.data.numpy())
+        # v = augs[key] / max(sizes[source], 1e-8)
+        probs[key] = float(augs[key].data.numpy())
 
     return probs

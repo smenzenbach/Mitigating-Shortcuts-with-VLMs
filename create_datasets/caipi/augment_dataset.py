@@ -37,7 +37,7 @@ def generate_counterexample(images, masks):
 
 def counterexamples(dataset_name, augmented_dir):
     with open(
-        f"data/datasets.yaml", "r"
+        f"data/datasets_info.yaml", "r"
     ) as file:
         dataset_yaml = yaml.safe_load(file)
     # set raw and gt paths
@@ -65,7 +65,11 @@ def counterexamples(dataset_name, augmented_dir):
         image = Image.open(raw_img_path).convert("RGB")
         image = np.array(image.resize((299, 299), resample=Image.LANCZOS))
         if os.path.exists(wr_mask_path):
-            wr_mask = np.array(Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
+            if not dataset_name == "ISIC19":
+                wr_mask = Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255)
+                wr_mask = np.array(wr_mask.resize((299, 299), resample=Image.LANCZOS))
+            else:
+                wr_mask = np.array(Image.open(wr_mask_path).convert("L").point(lambda x: 0 if x < 128 else 255))
         else:
             continue  # we cannot generate counterexamples without wr masks
 
