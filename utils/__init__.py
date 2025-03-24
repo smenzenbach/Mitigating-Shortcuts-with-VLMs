@@ -14,7 +14,7 @@ from .data_utils import (
     read_h5,
     extract_index,
     filter_list_by_csv,
-#    chunks,
+    chunks,
 )
 
 from .image_and_mask_utils import dilate_mask

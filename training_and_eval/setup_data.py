@@ -16,6 +16,16 @@ from utils import create_file_names_list, dilate_mask, MyLogger
 # get dir of repo (parent dir)
 repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+coco_file_exceptions = [
+    '000000301102.jpg', '000000389986.jpg', '000000279331.jpg', '000000129186.jpg', '000000111062.jpg', 
+    '000000552656.jpg', '000000018319.jpg', '000000141946.jpg', '000000080194.jpg', '000000525815.jpg', 
+    '000000063270.jpg', '000000383220.jpg', '000000157107.jpg', '000000029875.jpg', '000000243783.jpg', 
+    '000000528550.jpg', '000000258304.jpg', '000000460279.jpg', '000000411857.jpg', '000000434981.jpg', 
+    '000000385114.jpg', '000000217289.jpg', '000000506209.jpg', '000000348516.jpg', '000000103966.jpg', 
+    '000000491430.jpg', '000000424105.jpg', '000000560180.jpg', '000000138299.jpg', '000000365999.jpg', 
+    '000000265748.jpg', '000000056896.jpg', '000000214856.jpg'
+]
+
 
 class Dataset:
     def __init__(self, dataset_name, model_name="vgg16", logger=None):
@@ -158,7 +168,12 @@ class Dataset:
                 ):
                     img_path = os.path.join(augmented_images_dir, row["filename"])
                 else:
-                    img_path = os.path.join(self.raw_dir, row["filename"])
+                    if row["filename"] in coco_file_exceptions:
+                        # replace val with train in self.raw_dir
+                        train_dir = self.raw_dir.replace("val", "train")
+                        img_path = os.path.join(train_dir, row["filename"])
+                    else:
+                        img_path = os.path.join(self.raw_dir, row["filename"])
                     if not os.path.exists(img_path):
                         # Check if the file is in a subdirectory of raw_dir
                         # TODO: this is too slow for large datasets how can I handle sub_dirs?
