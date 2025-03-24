@@ -12,6 +12,7 @@ numpy
 h5py
 captum
 toml
+pycocotools
 
 loguru
 tensorboard
