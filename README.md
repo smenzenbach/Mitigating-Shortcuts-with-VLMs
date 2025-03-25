@@ -65,6 +65,40 @@ To configure the models, prompts and other parameters used for the pipeline, a c
     - `batch_size`: number of images to process in a batch (Optional,Default: 50)
     - `dilation_iterations`: Number of dilation iterations to apply to the segmentation mask (Optional,Default: 5)
 
+### Run confounder classification
+Depending on the model used you need to login to the Huggingface hub to have access. To run the confounder classification step, use the following command:
+```bash
+python pipeline/pipe_confounder_classification/run_confounder_classification.py --config /path/to/config.toml --device gpu_id
+```
+`--device` or short `-d` is the id of the GPU to use. If not provided, the code will use 0 as default.
+
+### Run segmentation
+To run the segmentation step, use the following command:
+```bash
+python pipeline/pipe_segmentation/run_segmentation.py --config /path/to/config.toml --device gpu_id
+```
+
+### Run inpainting
+To run the inpainting step, use the following command:
+```bash
+python pipeline/pipe_inpainting/run_inpainting.py --config /path/to/config.toml --device gpu_id
+```
+
+### Training and evaluation
+To train and evaluate the models, use the following command:
+```bash
+python training_and_eval/train_and_eval.py --dataset dataset_name -d gpu_id --id identifier_of_run --model model_name --batch_size 64 --augmented_images_dir /path/to/inpainting
+```
+- `dataset_name`: Name of the dataset (e.g. `CelebA`, `ISIC19` or `coco`)
+- `gpu_id`: ID of the GPU to use, default is 0
+- `identifier_of_run`: Identifier of the run
+- `model_name`: Name of the model to use (e.g. `resnet50`, `vgg16`)
+- `batch_size`: Batch size to use for training
+- `augmented_images_dir`: Path to the directory containing the inpainted images
+
+### Results
+The results of the models are saved in the `training_and_eval/eval_output` directory. For evaluation we save the accurcy, the worst group accuracy, and the wrong reason and right readon metric.
+
 
 
 
