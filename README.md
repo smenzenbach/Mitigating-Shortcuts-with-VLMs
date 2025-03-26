@@ -36,12 +36,13 @@ Important information needed to run the pipeline, training and evaluation of the
 
 
 ### Config file
-To configure the models, prompts and other parameters used for the pipeline, a config file is used. The config file is a TOML file that contains the following sections:
+To configure the models, prompts and other parameters used for the pipeline, a config file is used. The config file is a TOML file with the name `config_configid.toml` that contains the following sections:
 
 - `dataset`: Contains the dataset name and the path to the YAML file containing the dataset information
     - `name`: Name of the dataset (same as directory name of the dataset; e.g. `CelebA`, `ISIC19` or `coco`)
 
 - `confounder_classification`: Contains the parameters for the confounder classification model (Optional)
+    - `use_existing`: If an existing classification file should be use, give config_id here (Optional)
     - `model`: Name of the model/method to use (e.g. `sgl`)
     - `output_for_true`: Output value expected from model for the presence of a confounder, i.e. what answers are considered as true (confounder present)
     - `batch_size`: After how many images the results are saved to csv file
@@ -54,6 +55,7 @@ To configure the models, prompts and other parameters used for the pipeline, a c
     - `chat_template`: Chat template to use for the model (Optional)
    
 - `segmentation`: Contains the parameters for the detection and segmentation model
+    - `use_existing`: If an existing segmentation folder should be used, give config_id here (Optional)
     - `model`: Name of the model to use (e.g. `groundingRMBG`)
     - `custom_vocabulary`: List of words to use for the open-vocabulary detection
     - `box_lower_threshold`: Lower threshold for how much area of the image is allowed to be covered by the bounding box (Optional)
@@ -64,6 +66,7 @@ To configure the models, prompts and other parameters used for the pipeline, a c
     - `prompts`: JSON of dict for each prompt. Each dict has the key `prompt` and optionally `filter_func` and `num_imgs`. `filter_func` is a function that filters the images . `num_imgs` is the number of images to use for the prompt 
     - `batch_size`: number of images to process in a batch (Optional,Default: 50)
     - `dilation_iterations`: Number of dilation iterations to apply to the segmentation mask (Optional,Default: 5)
+    - `dilation_ratio`: The ratio [1, 100] of the kernel size to the mask size. The mask size is devided by the ratio to get the kernel size (Optional,Default: 60)
 
 ### Run confounder classification
 Depending on the model used you need to login to the Huggingface hub to have access. To run the confounder classification step, use the following command:
