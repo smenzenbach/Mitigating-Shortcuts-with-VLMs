@@ -17,7 +17,9 @@ class MyLogger:
         # File Handler
         file_handler = logging.FileHandler(logging_file)
         file_handler.setLevel(logging.INFO)
-        file_handler.setFormatter(CustomFormatter())
+        file_handler.setFormatter(
+            logging.Formatter("%(asctime)s  %(levelname)s  %(message)s")
+        )
         self.logger.addHandler(file_handler)
 
 
