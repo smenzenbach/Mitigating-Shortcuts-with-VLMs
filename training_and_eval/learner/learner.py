@@ -274,7 +274,7 @@ class Learner:
         criterion=F.cross_entropy,
         class_labels=None,
         save=True,
-        worst_group=False,
+        flag="",
     ):
         """Calculates confusion matrix and different statistics on dataloader."""
 
@@ -311,12 +311,8 @@ class Learner:
         print(f"{cr}")
 
         if save:
-            if worst_group:
-                wg_flag = "worst-group-"
-            else:
-                wg_flag = ""
             with open(
-                f"{self.output_dir}/{self.modelname}-STATS-test-{wg_flag}accuracy.txt",
+                f"{self.output_dir}/{self.modelname}-STATS-test-{flag}accuracy.txt",
                 "w",
             ) as f:
                 f.write(f"Acc: {100*correct:>0.1f}%, Avg loss: {test_loss:>8f}\n")

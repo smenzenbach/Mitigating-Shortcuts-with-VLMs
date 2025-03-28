@@ -1,8 +1,6 @@
 import os
 import sglang as sgl
 from sglang.lang.chat_template import get_chat_template
-from sglang.utils import launch_server_cmd, terminate_process, wait_for_server
-import csv
 import multiprocessing as mp
 import pandas as pd
 from tqdm import tqdm
@@ -178,7 +176,7 @@ def build_pred_csv_sgl_with_backend(
     batch_size=50,
     model_path="liuhaotian/llava-v1.6-vicuna-7b",
     tokenizer_path=None,  # "llava-hf/llava-1.5-7b-hf",
-    chat_template="vicuna_v1.1",
+    chat_template=None,  # "vicuna_v1.1",
     device="0",
     resize_size=None,
     logger=None,
@@ -218,8 +216,11 @@ def build_pred_csv_sgl_with_backend(
     runtime = sgl.Runtime(
         model_path=model_path,
         tokenizer_path=tokenizer_path,
+        trust_remote_code=True,
+        mem_fraction_static=0.9,
     )
-    runtime.endpoint.chat_template = get_chat_template(chat_template)
+    if chat_template is not None:
+        runtime.endpoint.chat_template = get_chat_template(chat_template)
     sgl.set_default_backend(runtime)
 
     build_pred_csv_sgl_batch(

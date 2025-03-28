@@ -17,7 +17,13 @@ from .data_utils import (
     chunks,
 )
 
-from .image_and_mask_utils import dilate_mask
+from .image_and_mask_utils import (
+    dilate_mask,
+    mask_on_image,
+    plot_grid,
+    get_empty_mask,
+    get_full_mask,
+)
 
 from .wr_and_rr_utils import (
     show_explanation_single,
@@ -41,6 +47,4 @@ from .segmentation_utils import (
 
 from .inpainting_utils import (
     inpainting_preprocessing,
-    get_empty_mask,
-    get_full_mask,
 )

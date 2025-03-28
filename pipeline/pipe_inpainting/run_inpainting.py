@@ -102,11 +102,9 @@ if __name__ == "__main__":
         sdxl_pipe, sdxl_generator = setup_diffusion_model(args.device)
 
     # get inpainting parameters
-    iterations = config["inpainting"]["dilation"]["iterations"]
-    if "batch_size" in config["inpainting"]:
-        batch_size = config["inpainting"]["batch_size"]
-    else:
-        batch_size = 50
+    dilation_iterations = config["inpainting"].get("dilation_iterations", 5)
+    dilation_ratio = config["inpainting"].get("dilation_ratio", 60)
+    batch_size = config["inpainting"].get("batch_size", 50)
 
     # get prompt
     prompts = json.loads(config["inpainting"]["prompts"])
@@ -201,7 +199,8 @@ if __name__ == "__main__":
                 inpaint_batch_lama(
                     mask_path_list,
                     image_path_list,
-                    iterations=iterations,
+                    iterations=dilation_iterations,
+                    ratio=dilation_ratio,
                     save_dir=target_inpainting_path,
                 )
             elif model_name == "sdxl":
@@ -211,7 +210,8 @@ if __name__ == "__main__":
                     prompt,
                     sdxl_pipe,
                     sdxl_generator,
-                    iterations=iterations,
+                    iterations=dilation_iterations,
+                    ratio=dilation_ratio,
                     save_dir=target_inpainting_path,
                 )
             else:
@@ -221,7 +221,8 @@ if __name__ == "__main__":
                     prompt,
                     sdxl_pipe,
                     sdxl_generator,
-                    iterations=iterations,
+                    iterations=dilation_iterations,
+                    ratio=dilation_ratio,
                     save_dir_intermediate=target_intermediate_inpainting_path,
                     save_dir_final=target_inpainting_path,
                 )

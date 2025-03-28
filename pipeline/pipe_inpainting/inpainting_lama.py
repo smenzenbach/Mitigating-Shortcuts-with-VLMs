@@ -35,9 +35,8 @@ def run_lama(imgs_path, masks_path, output_dir):
 def inpaint_batch_lama(
     mask_path_list,
     image_path_list,
-    kernel_size=5,
     iterations=4,
-    dilation_size=None,
+    ratio=60,
     save_dir=None,
 ):
     with tempfile.TemporaryDirectory() as tmpdirname:
@@ -63,7 +62,7 @@ def inpaint_batch_lama(
 
             # get image and dilated mask
             img, dilated_mask = inpainting_preprocessing(
-                image_path, mask_path, dilation_size, kernel_size, iterations
+                image_path, mask_path, iterations, ratio
             )
 
             cv2.imwrite(img_temp_path, cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR))

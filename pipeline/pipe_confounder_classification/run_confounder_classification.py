@@ -5,6 +5,7 @@ import toml
 import csv
 import argparse
 import pandas as pd
+from huggingface_hub import login
 
 
 from pipeline.pipe_confounder_classification.confounder_classification_sgl import (
@@ -13,6 +14,7 @@ from pipeline.pipe_confounder_classification.confounder_classification_sgl impor
 
 from utils import create_file_names_list_from_csv, get_images_from_list, MyLogger
 
+login("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")
 
 parser = argparse.ArgumentParser(description="Perform confounder classification")
 
@@ -25,7 +27,7 @@ parser.add_argument(
     "--device",
     type=str,
     default="0",
-    help="Device to use for classification. Default: cuda",
+    help="Device to use for classification. Default: 0",
 )
 
 

@@ -17,13 +17,39 @@ from utils import create_file_names_list, dilate_mask, MyLogger
 repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 coco_file_exceptions = [
-    '000000301102.jpg', '000000389986.jpg', '000000279331.jpg', '000000129186.jpg', '000000111062.jpg', 
-    '000000552656.jpg', '000000018319.jpg', '000000141946.jpg', '000000080194.jpg', '000000525815.jpg', 
-    '000000063270.jpg', '000000383220.jpg', '000000157107.jpg', '000000029875.jpg', '000000243783.jpg', 
-    '000000528550.jpg', '000000258304.jpg', '000000460279.jpg', '000000411857.jpg', '000000434981.jpg', 
-    '000000385114.jpg', '000000217289.jpg', '000000506209.jpg', '000000348516.jpg', '000000103966.jpg', 
-    '000000491430.jpg', '000000424105.jpg', '000000560180.jpg', '000000138299.jpg', '000000365999.jpg', 
-    '000000265748.jpg', '000000056896.jpg', '000000214856.jpg'
+    "000000301102.jpg",
+    "000000389986.jpg",
+    "000000279331.jpg",
+    "000000129186.jpg",
+    "000000111062.jpg",
+    "000000552656.jpg",
+    "000000018319.jpg",
+    "000000141946.jpg",
+    "000000080194.jpg",
+    "000000525815.jpg",
+    "000000063270.jpg",
+    "000000383220.jpg",
+    "000000157107.jpg",
+    "000000029875.jpg",
+    "000000243783.jpg",
+    "000000528550.jpg",
+    "000000258304.jpg",
+    "000000460279.jpg",
+    "000000411857.jpg",
+    "000000434981.jpg",
+    "000000385114.jpg",
+    "000000217289.jpg",
+    "000000506209.jpg",
+    "000000348516.jpg",
+    "000000103966.jpg",
+    "000000491430.jpg",
+    "000000424105.jpg",
+    "000000560180.jpg",
+    "000000138299.jpg",
+    "000000365999.jpg",
+    "000000265748.jpg",
+    "000000056896.jpg",
+    "000000214856.jpg",
 ]
 # for coco_ds
 coco_file_expceptions = []
@@ -590,6 +616,38 @@ class Dataset:
         else:
             dataloaders["worst_group_test"] = None
             self.logger.warning("Worst-group test set is empty.")
+
+        ##### for evaluation of bad wg acc of CelebA ######
+        confounded_indices = np.where(test_confounder == 1)[0].tolist()
+        non_confounded_indices = np.where(test_confounder == 0)[0].tolist()
+
+        confounded_test_set = torch.utils.data.Subset(
+            datasets["test"], confounded_indices
+        )
+        non_confounded_test_set = torch.utils.data.Subset(
+            datasets["test"], non_confounded_indices
+        )
+
+        dataloaders["confounded_test"] = DataLoader(
+            confounded_test_set,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+            persistent_workers=True,
+            prefetch_factor=3,
+        )
+
+        dataloaders["non_confounded_test"] = DataLoader(
+            non_confounded_test_set,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=num_workers,
+            pin_memory=pin_memory,
+            persistent_workers=True,
+            prefetch_factor=3,
+        )
+        ##### end eval of bad wg acc Celeb A #######
 
         return dataloaders, loss_weights
 

@@ -57,8 +57,8 @@ def inpaint_instance_sdxl(
     prompt,
     pipeline,
     generator,
-    kernel_size=5,
     iterations=4,
+    ratio=60,
     save_dir=None,
 ):
     # Save the dilated mask and images to the temporary file
@@ -71,7 +71,7 @@ def inpaint_instance_sdxl(
 
     # get image and dilated mask
     img, dilated_mask = inpainting_preprocessing(
-        image_path, mask_path, kernel_size, iterations
+        image_path, mask_path, iterations, ratio
     )
 
     # run inpainting using sdxl
@@ -98,8 +98,8 @@ def inpaint_batch_sdxl(
     prompt,
     pipeline,
     generator,
-    kernel_size=5,
     iterations=4,
+    ratio=60,
     save_dir=None,
 ):
     # Save the dilated mask and images to the temporary file
@@ -114,7 +114,7 @@ def inpaint_batch_sdxl(
 
         # get image and dilated mask
         img, dilated_mask = inpainting_preprocessing(
-            image_path, mask_path, kernel_size, iterations
+            image_path, mask_path, iterations, ratio
         )
 
         # run inpainting using sdxl

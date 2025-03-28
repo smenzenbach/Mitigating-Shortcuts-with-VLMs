@@ -117,11 +117,20 @@ dataloaders, loss_weights = dataset.load_dataloaders_and_loss_weights(
 general_logger.info(f"Data loaded for {identifier}. \n")
 logger.info(f"Data loaded.\n")
 
-train_dataloader, val_dataloader, test_dataloader, wg_test_dataloader = (
+(
+    train_dataloader,
+    val_dataloader,
+    test_dataloader,
+    wg_test_dataloader,
+    confounded_dataloader,
+    non_confounded_dataloader,
+) = (
     dataloaders["train"],
     dataloaders["val"],
     dataloaders["test"],
     dataloaders["worst_group_test"],
+    dataloaders["confounded_test"],
+    dataloaders["non_confounded_test"],
 )
 
 ########### Initalize model, loss and optimizer
@@ -193,10 +202,18 @@ logger.info("Accuracy on test set DONE.")
 
 # Worst-group accuracy
 if wg_test_dataloader is not None:
-    learner.validation_statistics(wg_test_dataloader, worst_group=True)
+    learner.validation_statistics(wg_test_dataloader, flag="worst-group-")
     logging.info("Accuracy on worst-group test set DONE.")
 else:
     logging.info("No worst-group test set provided.")
+
+# Confounded and non-confounded accuracy
+learner.validation_statistics(confounded_dataloader, flag="confounded-")
+logging.info("Accuracy on confounded test set DONE.")
+
+learner.validation_statistics(non_confounded_dataloader, flag="non-confounded-")
+logging.info("Accuracy on non-confounded test set DONE.")
+
 
 # WR
 learner.get_wr_metric(test_dataloader)

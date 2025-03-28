@@ -22,6 +22,7 @@ def inpaint_instance_lama_sdxl(
     pipeline,
     generator,
     iterations=4,
+    ratio=60,
     save_dir_intermediate=None,
     save_dir_final=None,
 ):
@@ -37,7 +38,9 @@ def inpaint_instance_lama_sdxl(
         return
 
     # get image and dilated mask
-    img, dilated_mask = inpainting_preprocessing(image_path, mask_path, iterations)
+    img, dilated_mask = inpainting_preprocessing(
+        image_path, mask_path, iterations, ratio
+    )
 
     with tempfile.TemporaryDirectory() as tmpdirname:
 
@@ -91,6 +94,7 @@ def inpaint_batch_lama_sdxl(
     pipeline,
     generator,
     iterations=4,
+    ratio=60,
     save_dir_intermediate=None,
     save_dir_final=None,
 ):
@@ -126,7 +130,7 @@ def inpaint_batch_lama_sdxl(
 
             # get image and dilated mask
             img, dilated_mask = inpainting_preprocessing(
-                image_path, mask_path, iterations
+                image_path, mask_path, iterations, ratio
             )
 
             cv2.imwrite(img_temp_path, cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR))
