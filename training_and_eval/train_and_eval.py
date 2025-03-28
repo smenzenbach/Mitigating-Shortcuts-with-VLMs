@@ -19,6 +19,8 @@ from learner.learner import Learner
 # python train_and_eval.py --dataset CelebA --augmented_images_dir /workspace/home/pipeline_outputs/CelebA/lama_sdxl/inpainting -d 2 --id lama_sdxl -l --model vgg16
 # python train_and_eval.py --dataset coco -d 3 --id vanilla --model resnet50 --batch_size 64
 # python train_and_eval.py --dataset coco -d 3 --id lama_sdxl --model resnet50 --batch_size 64 --augmented_images_dir /workspace/home/pipeline_outputs/coco/racket_person/inpainting
+# --dataset coco --augmented_images_dir data/coco/augmented/caipi --id caipi --model resnet50
+
 
 parser = argparse.ArgumentParser(
     description="SHORTCUT MITIGATION THROUGH INPAINTING EVAL"
