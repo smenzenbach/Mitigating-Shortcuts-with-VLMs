@@ -28,34 +28,36 @@ with open(csv_path, "w", newline="") as csvfile:
         imgIds = coco.getImgIds()
 
         # get all images containing given categories
-        catId_person = coco.getCatIds(catNms=["person"])
-        catId_racket = coco.getCatIds(catNms=["tennis racket"])
-        imgIds_person = coco.getImgIds(catIds=catId_person)
-        imgIds_racket = coco.getImgIds(catIds=catId_racket)
+        catId_spurious = coco.getCatIds(catNms=["person"])
+        catId_main = coco.getCatIds(catNms=["tennis racket"])
+        imgIds_spurious = coco.getImgIds(catIds=catId_spurious)
+        imgIds_main = coco.getImgIds(catIds=catId_main)
+
+
 
         # find intersection of images with person and racket and complements
-        imgIds_person = set(imgIds_person)
-        imgIds_racket = set(imgIds_racket)
-        imgIds_person_racket = imgIds_person.intersection(imgIds_racket)
-        imgIds_only_person = imgIds_person - imgIds_person_racket
-        imgIds_only_racket = imgIds_racket - imgIds_person_racket
+        imgIds_spurious = set(imgIds_spurious)
+        imgIds_main = set(imgIds_main)
+        imgIds_both = imgIds_spurious.intersection(imgIds_main)
+        imgIds_only_spurious = imgIds_spurious - imgIds_both
+        imgIds_only_main = imgIds_main - imgIds_both
 
         print(f"Split: {split_key}")
         print(f"Images: {len(imgIds)}")
-        print(f"Images with person: {len(imgIds_person)}")
-        print(f"Images with racket: {len(imgIds_racket)}")
-        print(f"Images with person and racket: {len(imgIds_person_racket)}")
-        print(f"Images with only person: {len(imgIds_only_person)}")
-        print(f"Images with only racket: {len(imgIds_only_racket)}")
+        print(f"Images with spurious: {len(imgIds_spurious)}")
+        print(f"Images with main: {len(imgIds_main)}")
+        print(f"Images with both: {len(imgIds_both)}")
+        print(f"Images with only spurious: {len(imgIds_only_spurious)}")
+        print(f"Images with only main: {len(imgIds_only_main)}")
 
         # write to csv
         for imgId in imgIds:
             filename = str(imgId).zfill(12) + ".jpg"
             class_label = (
-                1 if imgId in imgIds_racket else 0
+                1 if imgId in imgIds_main else 0
             )  # racket = 1, no racket = 0
             confounder_label = (
-                1 if imgId in imgIds_person else 0
+                1 if imgId in imgIds_spurious else 0
             )  # person = 1, no person = 0
             split = 0 if split_key == "train" else 2  # no validation set, so val = test
             # move all images with only racket to test
@@ -74,3 +76,5 @@ with open(csv_path, "w", newline="") as csvfile:
 
 # sort csv by filename
 sort_csv_by_column(csv_path, 0)
+
+
