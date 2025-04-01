@@ -18,6 +18,7 @@ loguru
 tensorboard
 
 transformers
+sglang
 
 # jupyter
 ipykernel
