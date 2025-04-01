@@ -1,0 +1,34 @@
+[dataset]
+name = "coco"
+
+
+[confounder_classification]
+model = 'sgl'
+output_for_true = ["yes", "yes."]
+batch_size = 4
+resize_size = 1080
+
+[confounder_classification.sgl]
+user_input_list = [
+    "This image is from a set of images depicting different object classes, e.g. tennis rackets, persons, etc.. We want to classify if there is a tennis racket in the image. We identified that the classification of tennis rackets is confounded by persons in the image. We want to identify whether there are persons in the images that include tennis rackets (which is not necesary). Is there a tennis racket AND a person in the image? Please explain if you see that.",
+    "Can you tell me, considering your explanation, in a short answer with one word of the options [yes, no], if the image contains a person as well as a tennis racket?",
+]
+model_path = "Qwen/Qwen2.5-VL-7B-Instruct"
+
+[segmentation]
+model = 'groundingRMBG'
+custom_vocabulary = ["person"]
+
+[inpainting]
+model = 'iopaint_lama_sdxl'
+num_batches = 300
+prompts = """
+{
+    \"prompt1\": {
+        \"prompt\": \"Extend the background, do not create persons!.\"
+    }
+}
+"""
+
+[inpainting.dilation]
+iterations = 1
