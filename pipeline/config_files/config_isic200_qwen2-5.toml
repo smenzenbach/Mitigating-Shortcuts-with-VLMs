@@ -1,0 +1,16 @@
+[dataset]
+name = "ISIC19_200"
+
+[confounder_classification]
+model = 'sgl'
+output_for_true = ["yes", "yes."]
+batch_size = 4
+resize_size = 1080
+
+
+[confounder_classification.sgl]
+user_input_list = [
+    "The image shows a close-up from a skin lesion. Is there something on the image that does not seem like it is part of the skin? I don't mean the lesion, but something else contrasting. Please explain.",
+    "Can you tell me, considering your explanation, if you see a coloful, ellipsoid, contrasting object attached on the skin or not? Answer with one word of the options [yes, no]",
+]
+model_path = "Qwen/Qwen2.5-VL-7B-Instruct"

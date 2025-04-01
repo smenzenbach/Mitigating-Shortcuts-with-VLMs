@@ -1,0 +1,81 @@
+2025-03-12 13:45:43,524  INFO  Performing confounder classification...
+2025-03-12 13:46:17,780  INFO  Performing confounder classification...
+2025-03-12 13:46:17,781  INFO  Using model sgl for confounder classification.
+2025-03-12 13:47:48,422  INFO  Performing confounder classification...
+2025-03-12 13:47:48,424  INFO  Using model sgl for confounder classification.
+2025-03-12 15:10:55,706  INFO  Performing confounder classification...
+2025-03-12 15:10:55,707  INFO  Using model sgl for confounder classification.
+2025-03-12 15:29:57,014  INFO  Performing confounder classification...
+2025-03-12 15:29:57,015  INFO  Using model sgl for confounder classification.
+2025-03-12 15:35:43,711  INFO  Performing confounder classification...
+2025-03-12 15:35:43,723  INFO  Using model sgl for confounder classification.
+[1;34;20m2025-03-13 17:18:58,492  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-13 17:18:58,494  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-13 17:32:39,871  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-13 17:32:39,873  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-13 17:37:24,230  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-13 17:37:24,232  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-13 17:38:08,889  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-13 17:38:08,893  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-13 18:05:20,355  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-13 18:05:20,356  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-13 18:10:38,404  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-13 18:10:38,405  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-13 18:15:00,327  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-13 18:15:00,329  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-14 15:14:28,429  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-14 15:14:28,430  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-14 15:26:05,950  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-14 15:26:05,952  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-14 15:41:07,441  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-14 15:41:07,443  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-14 15:45:56,314  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-14 15:45:56,316  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-14 15:53:23,289  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-14 15:53:23,290  INFO  Already classified 50 images. 110/160 images remaining.[0m
+[1;34;20m2025-03-14 15:53:23,291  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-14 15:58:51,853  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-14 15:58:51,853  INFO  Already classified 50 images. 110/160 images remaining.[0m
+[1;34;20m2025-03-14 15:58:51,855  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-14 16:04:41,204  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-14 16:04:41,204  INFO  Already classified 50 images. 110/160 images remaining.[0m
+[1;34;20m2025-03-14 16:04:41,207  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-14 16:05:57,264  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-14 16:05:57,265  INFO  Already classified 50 images. 110/160 images remaining.[0m
+[1;34;20m2025-03-14 16:05:57,266  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-14 16:08:30,064  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-14 16:08:30,064  INFO  Already classified 50 images. 110/160 images remaining.[0m
+[1;34;20m2025-03-14 16:08:30,065  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-14 16:09:51,851  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-14 16:09:51,851  INFO  Already classified 50 images. 110/160 images remaining.[0m
+[1;34;20m2025-03-14 16:09:51,852  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-14 16:31:07,584  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-14 16:31:07,585  INFO  Already classified 50 images. 110/160 images remaining.[0m
+[1;34;20m2025-03-14 16:31:07,586  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-14 16:33:34,381  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-14 16:33:34,381  INFO  Already classified 50 images. 110/160 images remaining.[0m
+[1;34;20m2025-03-14 16:33:34,382  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-14 16:34:36,640  INFO  Resizing images to 1080[0m
+[1;34;20m2025-03-14 16:37:46,450  INFO  Performing confounder classification...[0m
+[1;34;20m2025-03-14 16:37:46,451  INFO  Already classified 50 images. 110/160 images remaining.[0m
+[1;34;20m2025-03-14 16:37:46,452  INFO  Using model sgl for confounder classification.[0m
+[1;34;20m2025-03-14 16:38:47,592  INFO  Resizing images to 1080[0m
+[1;34;20m2025-03-14 16:53:27,478  INFO  Performing segmentation...[0m
+[1;34;20m2025-03-14 16:54:03,509  INFO  Performing segmentation...[0m
+[1;34;20m2025-03-14 16:54:03,537  INFO  Using model groundingRMBG for segmentation.[0m
+[1;34;20m2025-03-14 16:58:03,462  INFO  Performing segmentation...[0m
+[1;34;20m2025-03-14 16:58:03,463  INFO  Already segmented 0 images. 34/34 images remaining.[0m
+[1;34;20m2025-03-14 16:58:03,465  INFO  Using model groundingRMBG for segmentation.[0m
+[1;34;20m2025-03-14 17:09:53,094  INFO  Performing segmentation...[0m
+[1;34;20m2025-03-14 17:09:53,095  INFO  Already segmented 0 images. 34/34 images remaining.[0m
+[1;34;20m2025-03-14 17:09:53,096  INFO  Using model groundingRMBG for segmentation.[0m
+[1;34;20m2025-03-14 17:17:41,757  INFO  Performing segmentation...[0m
+[1;34;20m2025-03-14 17:17:41,758  INFO  Already segmented 0 images. 34/34 images remaining.[0m
+[1;34;20m2025-03-14 17:17:41,758  INFO  Using model groundingRMBG for segmentation.[0m
+[1;34;20m2025-03-14 17:19:33,093  INFO  Performing segmentation...[0m
+[1;34;20m2025-03-14 17:19:33,093  INFO  Already segmented 0 images. 34/34 images remaining.[0m
+[1;34;20m2025-03-14 17:19:33,094  INFO  Using model groundingRMBG for segmentation.[0m
+[1;34;20m2025-03-14 17:30:58,096  INFO  Performing inpainting...[0m
+[1;34;20m2025-03-14 17:38:19,929  INFO  Performing inpainting...[0m
+[1;34;20m2025-03-14 17:55:51,092  INFO  Performing inpainting...[0m
+[1;34;20m2025-03-14 17:56:29,407  INFO  Performing inpainting...[0m

@@ -1,0 +1,4 @@
+2025-03-26 16:53:17,975  INFO  Performing inpainting...
+2025-03-26 16:53:17,975  ERROR  Segmentation path /workspace/home/Mitigating-Shortcuts-with-VLMs/pipeline/pipeline_outputs/coco/racket_person2/seg does not exist. Perform segmentation first. Exiting.
+2025-03-26 16:54:08,899  INFO  Using existing segmentation with id racket_person
+2025-03-26 16:54:08,899  ERROR  Existing segmentation not found at /workspace/home/Mitigating-Shortcuts-with-VLMs/pipeline/pipeline_outputs/coco/racket_person/seg. Exiting.
