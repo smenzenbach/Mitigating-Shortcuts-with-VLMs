@@ -20,7 +20,7 @@ CelebA:
   worst_group_class_label: 1 # male with blond hair
 
 coco: 
-  gt_label_path: /workspace/home/data/coco/gt_label.csv
+  gt_label_path: /workspace/home/Mitigating-Shortcuts-with-VLMs/data/coco/gt_label.csv
   wr_masks_dir: /workspace/home/data/coco/wr_masks
   rr_masks_dir: /workspace/home/data/coco/rr_masks
   raw_dir: /workspace/datasets/coco/images/val2017 # sub dir handling too slow
