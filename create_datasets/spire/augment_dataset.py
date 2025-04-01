@@ -7,7 +7,6 @@ from PIL import Image
 import argparse
 import utils
 import csv
-import random
 
 def augment_dataset(dataset_name, augmented_dir, no_class_change):
     with open(f"data/datasets_info.yaml", "r") as file:
@@ -124,7 +123,7 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         # create one augmented version with rr and wr removed if it exists
         if add_conf:
             # select a random image wich contains a confounder
-            reference_image_name = random.choice(groups['confounded'])
+            reference_image_name = np.random.choice(groups['confounded'], 1)[0]
             # load reference image and mask
             ref_image = Image.open(os.path.join(raw_dir, reference_image_name)).convert("RGB")
             ref_image = np.array(ref_image.resize((299, 299), resample=Image.LANCZOS))
@@ -194,7 +193,7 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
                 aug_confounder_labels.append(0)
         if add_class:
             # select a random image wich contains the class
-            reference_image_name = random.choice(groups['class'], 1)
+            reference_image_name = np.random.choice(groups['class'], 1)[0]
             # load reference image and mask     
             ref_image = Image.open(os.path.join(raw_dir, reference_image_name)).convert("RGB")
             ref_image = np.array(ref_image.resize((299, 299), resample=Image.LANCZOS))
@@ -250,7 +249,7 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
         # create one augmented version with rr and wr removed if it exists
         if add_conf:
             # select a random image wich contains a confounder
-            reference_image_name = random.choice(groups['confounded'])
+            reference_image_name = np.random.choice(groups['confounded'], 1)[0]
             # load reference image and mask
             ref_image = Image.open(os.path.join(raw_dir, reference_image_name)).convert("RGB")
             ref_image = np.array(ref_image.resize((299, 299), resample=Image.LANCZOS))
@@ -264,7 +263,7 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
             aug_confounder_labels.append(1)
         if add_class:
             # select a random image wich contains a confounder
-            reference_image_name = random.choice(groups['class'])
+            reference_image_name = np.random.choice(groups['class'], 1)[0]
             # load reference image and mask
             ref_image = Image.open(os.path.join(raw_dir, reference_image_name)).convert("RGB")
             ref_image = np.array(ref_image.resize((299, 299), resample=Image.LANCZOS))
@@ -295,8 +294,8 @@ def augment_dataset(dataset_name, augmented_dir, no_class_change):
 if __name__ == "__main__":
     # Set up argument parser
     parser = argparse.ArgumentParser(description="Create an augmented version of the dataset for Spire")
-    parser.add_argument("--dataset_name", type=str, help="Name of the dataset config", default="coco")
-    parser.add_argument("--augmented_dir", type=str, help="Path to the augmented directory", default="data/coco/augmented/spire")
+    parser.add_argument("--dataset_name", type=str, help="Name of the dataset config", default="coco_ds")
+    parser.add_argument("--augmented_dir", type=str, help="Path to the augmented directory", default="data/coco_dogsheep/augmented/spire")
     parser.add_argument("-no_class_change", action="store_true", help="Whether the class attribute can be modified by Spire")
 
     args = parser.parse_args()
