@@ -51,6 +51,8 @@ coco_file_exceptions = [
     "000000056896.jpg",
     "000000214856.jpg",
 ]
+# for coco_ds
+coco_file_expceptions = []
 
 
 class Dataset:
