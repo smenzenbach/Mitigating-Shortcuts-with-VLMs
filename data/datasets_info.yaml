@@ -27,8 +27,8 @@ coco:
   worst_group_class_label: 1 # tennis racket without person
 
 coco_ds: 
-  gt_label_path: data/coco_dogsheep/gt_label.csv
-  wr_masks_dir: data/coco_dogsheep/wr_masks
-  rr_masks_dir: data/coco_dogsheep/rr_masks
-  raw_dir: datasets/coco/images/val2017
+  gt_label_path: data/coco_ds/gt_label.csv
+  wr_masks_dir: data/coco_ds/wr_masks
+  rr_masks_dir: data/coco_ds/rr_masks
+  raw_dir: datasets/coco/images/train2017
   worst_group_class_label: 1 # tennis racket without person
